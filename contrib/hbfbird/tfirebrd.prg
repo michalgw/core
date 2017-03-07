@@ -47,22 +47,7 @@
  */
 
 #include "hbclass.ch"
-
-#define SQL_TEXT                        452
-#define SQL_VARYING                     448
-#define SQL_SHORT                       500
-#define SQL_LONG                        496
-#define SQL_FLOAT                       482
-#define SQL_DOUBLE                      480
-#define SQL_D_FLOAT                     530
-#define SQL_TIMESTAMP                   510
-#define SQL_BLOB                        520
-#define SQL_ARRAY                       540
-#define SQL_QUAD                        550
-#define SQL_TYPE_TIME                   560
-#define SQL_TYPE_DATE                   570
-#define SQL_INT64                       580
-#define SQL_DATE                        SQL_TIMESTAMP
+#include "hbfbird.ch"
 
 CREATE CLASS TFbServer
 
@@ -73,7 +58,7 @@ CREATE CLASS TFbServer
    VAR      lError
    VAR      dialect
 
-   METHOD   New( cServer, cUser, cPassword, nDialect )
+   METHOD   New( cServer, cUser, cPassword, nDialect, aParams )
    METHOD   Destroy()  INLINE FBClose( ::db )
    METHOD   Close()    INLINE FBClose( ::db )
 
@@ -81,16 +66,16 @@ CREATE CLASS TFbServer
    METHOD   ListTables()
    METHOD   TableStruct( cTable )
 
-   METHOD   StartTransaction()
+   METHOD   StartTransaction( aParams )
    METHOD   Commit()
    METHOD   Rollback()
 
-   METHOD   Execute( cQuery )
-   METHOD   Query( cQuery )
+   METHOD   Execute( cQuery, oTransaction )
+   METHOD   Query( cQuery, oTransaction )
 
-   METHOD   Update( oRow, cWhere )
-   METHOD   Delete( oRow, cWhere )
-   METHOD   Append( oRow )
+   METHOD   Update( oRow, cWhere, oTransaction )
+   METHOD   Delete( oRow, cWhere, oTransaction )
+   METHOD   Append( oRow, oTransaction )
 
    METHOD   NetErr()   INLINE ::lError
    METHOD   Error()    INLINE FBError( ::nError )
@@ -98,7 +83,7 @@ CREATE CLASS TFbServer
 
 ENDCLASS
 
-METHOD New( cServer, cUser, cPassword, nDialect ) CLASS TFbServer
+METHOD New( cServer, cUser, cPassword, nDialect, aParams ) CLASS TFbServer
 
    hb_default( @nDialect, 1 )
 
@@ -107,7 +92,7 @@ METHOD New( cServer, cUser, cPassword, nDialect ) CLASS TFbServer
    ::StartedTrans := .F.
    ::Dialect := nDialect
 
-   ::db := FBConnect( cServer, cUser, cPassword )
+   ::db := FBConnect( cServer, cUser, cPassword, aParams )
 
    IF HB_ISNUMERIC( ::db )
       ::lError := .T.
@@ -116,11 +101,11 @@ METHOD New( cServer, cUser, cPassword, nDialect ) CLASS TFbServer
 
    RETURN self
 
-METHOD StartTransaction() CLASS TFbServer
+METHOD StartTransaction( aParams ) CLASS TFbServer
 
    LOCAL result := .F.
 
-   ::trans := FBStartTransaction( ::db )
+   ::trans := FBStartTransaction( ::db, aParams )
 
    IF HB_ISNUMERIC( ::trans )
       ::lError := .T.
@@ -172,17 +157,24 @@ METHOD Commit() CLASS TFbServer
 
    RETURN result
 
-METHOD Execute( cQuery ) CLASS TFbServer
+METHOD Execute( cQuery, oTransaction ) CLASS TFbServer
 
    LOCAL result
    LOCAL n
 
    cQuery := RemoveSpaces( cQuery )
 
-   IF ::StartedTrans
-      n := FBExecute( ::db, cQuery, ::dialect, ::trans )
+   IF HB_ISOBJECT( oTransaction )
+      IF ! oTransaction:lActive
+         oTransaction:Start()
+      ENDIF
+      n := FBExecute( ::db, cQuery, ::dialect, oTransaction:transHandle )
    ELSE
-      n := FBExecute( ::db, cQuery, ::dialect )
+      IF ::StartedTrans
+         n := FBExecute( ::db, cQuery, ::dialect, ::trans )
+      ELSE
+         n := FBExecute( ::db, cQuery, ::dialect )
+      ENDIF      
    ENDIF
 
    IF n < 0
@@ -197,8 +189,8 @@ METHOD Execute( cQuery ) CLASS TFbServer
 
    RETURN result
 
-METHOD Query( cQuery ) CLASS TFbServer
-   RETURN TFBQuery():New( ::db, cQuery, ::dialect )
+METHOD Query( cQuery, oTransaction ) CLASS TFbServer
+   RETURN TFBQuery():New( ::db, cQuery, ::dialect, oTransaction )
 
 METHOD TableExists( cTable ) CLASS TFbServer
 
@@ -350,7 +342,7 @@ METHOD TableStruct( cTable ) CLASS TFbServer
 
    RETURN result
 
-METHOD Delete( oRow, cWhere ) CLASS TFbServer
+METHOD Delete( oRow, cWhere, oTransaction ) CLASS TFbServer
 
    LOCAL result := .F.
    LOCAL aKeys, i, nField, xField, cQuery, aTables
@@ -379,13 +371,13 @@ METHOD Delete( oRow, cWhere ) CLASS TFbServer
       IF !( cWhere == "" )
          cQuery := 'DELETE FROM ' + aTables[ 1 ] + ' WHERE ' + cWhere
 
-         result := ::Execute( cQuery )
+         result := ::Execute( cQuery, oTransaction )
       ENDIF
    ENDIF
 
    RETURN result
 
-METHOD Append( oRow ) CLASS TFbServer
+METHOD Append( oRow, oTransaction ) CLASS TFbServer
 
    LOCAL result := .F.
    LOCAL cQuery, i, aTables
@@ -413,12 +405,12 @@ METHOD Append( oRow ) CLASS TFbServer
 
       cQuery := Left( cQuery, Len( cQuery ) - 1  ) + ")"
 
-      result := ::Execute( cQuery )
+      result := ::Execute( cQuery, oTransaction )
    ENDIF
 
    RETURN result
 
-METHOD Update( oRow, cWhere ) CLASS TFbServer
+METHOD Update( oRow, cWhere, oTransaction ) CLASS TFbServer
 
    LOCAL result := .F.
    LOCAL aKeys, cQuery, i, nField, xField, aTables
@@ -454,12 +446,122 @@ METHOD Update( oRow, cWhere ) CLASS TFbServer
       IF !( cWhere == "" )
          cQuery := Left( cQuery, Len( cQuery ) - 1 ) + " WHERE " + cWhere
 
-         result := ::Execute( cQuery )
+         result := ::Execute( cQuery, oTransaction )
       ENDIF
    ENDIF
 
    RETURN result
 
+CREATE CLASS TFbTransaction
+
+   VAR      nDbHandle
+   VAR      aParams
+   VAR      transHandle
+   VAR      lActive        INIT .F.
+   VAR      lDefaultCommit INIT .F.
+   VAR      nLastError
+
+   METHOD   New( nDB, aParams, lStart )
+   METHOD   Destroy()  
+   METHOD   Start()
+   METHOD   Commit()
+   METHOD   CommitRetaining()
+   METHOD   Rollback()
+   METHOD   RollbackRetaining()
+   
+ENDCLASS
+
+METHOD New( nDB, aParams, lStart ) CLASS TFbTransaction
+   IF HB_ISPOINTER( nDB )
+      ::nDbHandle := nDB
+   ELSE
+      ::nDbHandle := nDB:db
+   ENDIF
+   
+   ::aParams := aParams
+   IF HB_ISLOGICAL( lStart ) .AND. lStart
+      ::Start()
+   ENDIF
+   RETURN Self
+   
+METHOD Destroy() CLASS TFbTransaction
+   IF ::lActive
+      IF ::lDefaultCommit
+         ::Commit()
+      ELSE
+         ::Rollback()
+      ENDIF
+   ENDIF
+   RETURN .T.
+
+METHOD Start() CLASS TFbTransaction
+   LOCAL lResult := ::lActive
+   IF ! ::lActive
+      ::transHandle := FBStartTransaction( ::nDbHandle, ::aParams )
+      IF HB_ISNUMERIC( ::transHandle )
+         lResult := .F.
+         ::nLastError := ::transHandle
+      ELSE
+         ::lActive := .T.
+         lResult := .T.
+      ENDIF
+   ENDIF
+   RETURN lResult
+
+METHOD Commit() CLASS TFbTransaction
+   LOCAL lResult := .F.
+   LOCAL n
+   IF ::lActive
+      IF ( n := FBCommit( ::transHandle ) ) < 0
+         ::nLastError := n
+      ELSE
+         lResult := .T.
+      ENDIF
+      ::lActive := .F.
+   ENDIF
+   RETURN lResult
+
+METHOD CommitRetaining() CLASS TFbTransaction
+   LOCAL lResult := .F.
+   LOCAL n
+   IF ::lActive
+      IF ( n := FBCommitRetaining( ::transHandle ) ) < 0
+         ::nLastError := n
+         ::lActive := .F.
+      ELSE
+         ::lActive := .T.
+         lResult := .T.
+      ENDIF
+   ENDIF
+   RETURN lResult
+
+METHOD Rollback() CLASS TFbTransaction
+   LOCAL lResult := .F.
+   LOCAL n
+   IF ::lActive
+      IF ( n := FBRollbackRetaining( ::transHandle ) ) < 0
+         ::nLastError := n
+      ELSE
+         lResult := .T.
+      ENDIF
+      ::lActive := .F.
+   ENDIF
+   RETURN lResult
+
+METHOD RollbackRetaining() CLASS TFbTransaction
+   LOCAL lResult := .F.
+   LOCAL n
+   IF ::lActive
+      IF ( n := FBRollbackRetaining( ::transHandle ) ) < 0
+         ::nLastError := n
+         ::lActive := .F.
+      ELSE
+         ::lActive := .T.
+         lResult := .T.
+      ENDIF
+   ENDIF
+   RETURN lResult
+   
 CREATE CLASS TFbQuery
 
    VAR      nError
@@ -476,8 +578,9 @@ CREATE CLASS TFbQuery
    VAR      query
    VAR      aKeys
    VAR      aTables
+   VAR      oTransaction
 
-   METHOD   New( nDB, cQuery, nDialect )
+   METHOD   New( nDB, cQuery, nDialect, oTransaction )
    METHOD   Destroy()
    METHOD   Close()            INLINE ::Destroy()
 
@@ -509,14 +612,15 @@ CREATE CLASS TFbQuery
 
 ENDCLASS
 
-METHOD New( nDB, cQuery, nDialect ) CLASS TFbQuery
+METHOD New( nDB, cQuery, nDialect, oTransaction ) CLASS TFbQuery
 
    ::db := nDb
    ::query := RemoveSpaces( cQuery )
    ::dialect := nDialect
    ::closed := .T.
    ::aKeys := NIL
-
+   ::oTransaction := oTransaction
+   
    ::Refresh()
 
    RETURN self
@@ -540,7 +644,14 @@ METHOD Refresh() CLASS TFbQuery
 
    result := .T.
 
-   qry := FBQuery( ::db, ::query, ::dialect )
+   IF HB_ISOBJECT( ::oTransaction )
+      IF ! ::oTransaction:lActive
+         ::oTransaction:Start()
+      ENDIF
+      qry := FBQuery( ::db, ::query, ::dialect, ::oTransaction:transHandle )
+   ELSE
+      qry := FBQuery( ::db, ::query, ::dialect )
+   ENDIF
 
    IF HB_ISARRAY( qry )
       ::numcols := qry[ 4 ]
@@ -1086,3 +1197,153 @@ STATIC FUNCTION RemoveSpaces( cQuery )
    ENDDO
 
    RETURN cQuery
+
+CREATE CLASS TFBSQL
+   HIDDEN:
+   VAR lActive      INIT .F.
+   VAR aQuery
+   VAR nLastError   INIT 0
+
+   VISIBLE:
+   VAR cSQL
+   VAR oDatabase
+   VAR oTransaction
+   
+   METHOD New( oDatabase, oTransaction, cSQL ) CONSTRUCTOR
+   DESTRUCTOR Free()
+   
+   METHOD Prepare()
+   METHOD Execute()
+   METHOD Fetch()
+   METHOD Close()
+   
+   METHOD ParamCount()
+   METHOD ParamInfo( nIndex )
+   METHOD SetParam( nIndex, xValue )
+   
+   METHOD FieldCount()
+   METHOD FieldInfo( nIndex )
+   METHOD FieldIndex( cFieldName )
+   METHOD GetValue( xIndexOrName )
+   
+   ACCESS Active INLINE ( ::lActive )
+   ACCESS Prepared INLINE ( ! Empty( ::aQuery ) )
+   ACCESS LastError INLINE ( ::nLastError )
+ENDCLASS
+
+METHOD New( oDatabase, oTransaction, cSQL ) CLASS TFBSQL
+   ::oDatabase := oDatabase
+   ::oTransaction := oTransaction
+   ::cSQL := cSQL
+   RETURN Self
+
+DESTRUCTOR Free() CLASS TFBSQL
+   ::Close()
+   RETURN
+
+METHOD Prepare() CLASS TFBSQL
+   LOCAL lRes := .F.
+   IF Empty( ::aQuery ) .AND. ! Empty( ::oDatabase ) .AND. ! Empty( ::oTransaction ) .AND. HB_ISCHAR( ::cSQL )
+      ::aQuery := FBSQLCreate( ::oDatabase:db, ::cSQL, 3, ::oTransaction:transHandle )
+      IF HB_ISARRAY( ::aQuery )
+         lRes := .T.
+      ELSE
+         ::nLastError := ::aQuery
+         ::aQuery := NIL
+      ENDIF
+   ENDIF
+   RETURN lRes
+
+METHOD Execute() CLASS TFBSQL   
+   LOCAL nRes
+   IF Empty( ::aQuery )
+      IF ! ::Prepare()
+         RETURN .F.
+      ENDIF
+   ENDIF
+   nRes := FBSQLExec( ::aQuery )
+   IF nRes <> 0
+      ::nLastError := nRes
+   ELSE
+      IF ( ::aQuery[ 7 ] == ISC_INFO_SQL_STMT_SELECT ) .OR. ( ::aQuery[ 7 ] == ISC_INFO_SQL_STMT_SELECT_FOR_UPD )
+         ::lActive := .T.
+      ENDIF
+   ENDIF
+   RETURN nRes == 0
+
+METHOD Fetch() CLASS TFBSQL
+   LOCAL nRes
+   IF Empty( ::aQuery )
+      RETURN .F.
+   ENDIF
+   nRes := FBFetch( ::aQuery )
+   IF nRes <> 0 .AND. nRes <> -1
+      ::nLastError := nRes
+   ENDIF
+   RETURN nRes
+
+METHOD Close() CLASS TFBSQL
+   LOCAL lRes := .F.
+   IF HB_ISARRAY( ::aQuery )
+      FBFree( ::aQuery )
+      ::aQuery := NIL
+      ::lActive := .F.
+      lRes := .T.
+   ENDIF
+   RETURN lRes
+
+METHOD ParamCount() CLASS TFBSQL
+   LOCAL nRes := 0
+   IF HB_ISARRAY( ::aQuery ) .AND. HB_ISARRAY( ::aQuery[ 9 ] )
+      nRes := Len( ::aQuery[ 9 ] )
+   ENDIF
+   RETURN nRes
+
+METHOD ParamInfo( nIndex ) CLASS TFBSQL
+   LOCAL aRes := {}
+   IF HB_ISARRAY( ::aQuery ) .AND. HB_ISARRAY( ::aQuery[ 9 ] )
+      aRes := Len( ::aQuery[ 9 ][ nIndex ] )
+   ENDIF
+   RETURN aRes
+
+METHOD SetParam( nIndex, xValue ) CLASS TFBSQL
+   LOCAL lRes := .F.
+   IF ::ParamCount() >= nIndex
+      lRes := FBSQLSetParam( ::aQuery, nIndex, xValue ) == 0
+   ENDIF
+   RETURN lRes
+
+METHOD FieldCount() CLASS TFBSQL
+   LOCAL nRes := 0
+   IF HB_ISARRAY( ::aQuery ) .AND. HB_ISARRAY( ::aQuery[ 6 ] )
+      nRes := Len( ::aQuery[ 6 ] )
+   ENDIF
+   RETURN nRes
+
+METHOD FieldInfo( nIndex ) CLASS TFBSQL
+   LOCAL aRes := {}
+   IF HB_ISARRAY( ::aQuery ) .AND. HB_ISARRAY( ::aQuery[ 6 ] )
+      aRes := ::aQuery[ 6 ][ nIndex ]
+   ENDIF
+   RETURN aRes
+
+METHOD FieldIndex( cFieldName ) CLASS TFBSQL
+   LOCAL nRes := 0
+   LOCAL nI
+   FOR nI := 1 TO ::FieldCount()      
+      IF Upper( ::aQuery[ 6 ][ nI ][ 1 ] ) == Upper( cFieldName )
+         nRes := nI
+         EXIT
+      ENDIF
+   NEXT
+   RETURN nRes
+
+METHOD GetValue( xIndexOrName ) CLASS TFBSQL
+   LOCAL xRes := NIL
+   IF HB_ISCHAR( xIndexOrName )
+      xIndexOrName := ::FieldIndex( xIndexOrName )
+   ENDIF
+   IF xIndexOrName > 0 .AND. xIndexOrName <= ::FieldCount()
+      xRes := FBSQLGetData( ::aQuery, xIndexOrName )
+   ENDIF
+   RETURN xRes
