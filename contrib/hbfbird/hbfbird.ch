@@ -133,3 +133,9 @@
 #define SQL_INT64                          580
 #define SQL_NULL                         32766
 #define SQL_DATE                           SQL_TIMESTAMP
+
+/* dataset states */
+#define FBDS_INACTIVE   0
+#define FBDS_BROWSE     1
+#define FBDS_EDIT       2
+#define FBDS_APPEND     3
