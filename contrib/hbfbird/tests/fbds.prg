@@ -58,7 +58,7 @@ FUNCTION Main()
    
    cQuery := "create domain boolean_field as smallint default 0 not null check (value in (0,1))"
    ? "Prepare 1# SQL (CREATE DOMAIN....)"
-   oSQL:cSQL := cQuery
+   oSQL:SQL := cQuery
    ? "Prepare..."
    IF ! oSQL:Prepare()
       ? "Error: " + Str( oSQL:LastError )
@@ -86,7 +86,7 @@ FUNCTION Main()
    cQuery += "     Description blob sub_type 1 segment size 40 ) "
 
    ? "Prepare 2# SQL (CREATE TABLE....)"
-   oSQL:cSQL := cQuery
+   oSQL:SQL := cQuery
    ? "Prepare..."
    IF ! oSQL:Prepare()
       ? "Error: " + Str( oSQL:LastError )

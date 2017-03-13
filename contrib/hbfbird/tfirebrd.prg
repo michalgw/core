@@ -165,10 +165,10 @@ METHOD Execute( cQuery, oTransaction ) CLASS TFbServer
    cQuery := RemoveSpaces( cQuery )
 
    IF HB_ISOBJECT( oTransaction )
-      IF ! oTransaction:lActive
+      IF ! oTransaction:Active
          oTransaction:Start()
       ENDIF
-      n := FBExecute( ::db, cQuery, ::dialect, oTransaction:transHandle )
+      n := FBExecute( ::db, cQuery, ::dialect, oTransaction:Handle )
    ELSE
       IF ::StartedTrans
          n := FBExecute( ::db, cQuery, ::dialect, ::trans )
@@ -453,58 +453,95 @@ METHOD Update( oRow, cWhere, oTransaction ) CLASS TFbServer
    RETURN result
 
 CREATE CLASS TFbTransaction
-
-   VAR      nDbHandle
+   
+   HIDDEN:
+   VAR      oDatabase
    VAR      aParams
    VAR      transHandle
    VAR      lActive        INIT .F.
-   VAR      lDefaultCommit INIT .F.
-   VAR      nLastError
+   VAR      nDefaultAction INIT FBTA_COMMIT
+   VAR      bBeforeAction
+   VAR      bAfterAction
+   
+   PROTECTED:
+   
+   METHOD DoBeforeAction( nAction )
+   METHOD DoAfterAction( nAction )
 
-   METHOD   New( nDB, aParams, lStart )
-   METHOD   Destroy()  
+   VISIBLE:
+   
+   METHOD   New( oDatabase, aParams, lStart ) CONSTRUCTOR
+   DESTRUCTOR Destroy()  
    METHOD   Start()
    METHOD   Commit()
    METHOD   CommitRetaining()
    METHOD   Rollback()
    METHOD   RollbackRetaining()
    
+   ACCESS   Database   INLINE ( ::oDatabase )
+   ASSIGN   Database   METHOD SetDatabase( oValue )
+   ACCESS   Params     INLINE ( ::aParams )
+   ASSIGN   Params     METHOD SetParams( aValue )
+   ACCESS   Active     INLINE ( ::lActive )
+   ASSIGN   Active     METHOD SetActive( lValue )
+   
+   ACCESS   Handle     INLINE ( ::transHandle )
+   
+   ACCESS   DefaultAction INLINE ( ::nDefaultAction )
+   ASSIGN   DefaultAction METHOD SetDefaultAction( nValue )
+   
+   ACCESS   BeforeAction INLINE ( ::bBeforeAction )
+   ASSIGN   BeforeAction( bValue ) INLINE ( ::bBeforeAction := bValue )
+   ACCESS   AfterAction INLINE ( ::bAfterAction )
+   ASSIGN   AfterAction( bValue ) INLINE ( ::bAfterAction := bValue )
+   
 ENDCLASS
 
-METHOD New( nDB, aParams, lStart ) CLASS TFbTransaction
-   IF HB_ISPOINTER( nDB )
-      ::nDbHandle := nDB
-   ELSE
-      ::nDbHandle := nDB:db
+METHOD DoBeforeAction( nAction ) CLASS TFbTransaction
+   IF HB_ISBLOCK( ::bBeforeAction )
+      Eval( ::bBeforeAction, Self, nAction )
    ENDIF
-   
+   RETURN NIL
+
+METHOD DoAfterAction( nAction ) CLASS TFbTransaction
+   IF HB_ISBLOCK( ::bAfterAction )
+      Eval( ::bAfterAction, Self, nAction )
+   ENDIF
+   RETURN NIL
+
+METHOD New( oDatabase, aParams, lStart ) CLASS TFbTransaction
+   ::oDatabase := oDatabase
    ::aParams := aParams
    IF HB_ISLOGICAL( lStart ) .AND. lStart
       ::Start()
    ENDIF
    RETURN Self
    
-METHOD Destroy() CLASS TFbTransaction
+DESTRUCTOR Destroy() CLASS TFbTransaction
    IF ::lActive
-      IF ::lDefaultCommit
+      IF ::nDefaultAction == FBTA_COMMIT .OR. ::nDefaultAction == FBTA_COMMITRETAINING
          ::Commit()
       ELSE
          ::Rollback()
       ENDIF
    ENDIF
-   RETURN .T.
+   RETURN
 
 METHOD Start() CLASS TFbTransaction
    LOCAL lResult := ::lActive
    IF ! ::lActive
-      ::transHandle := FBStartTransaction( ::nDbHandle, ::aParams )
+      ::DoBeforeAction( FBTA_START )
+      ::transHandle := FBStartTransaction( ::oDatabase:db, ::aParams )
       IF HB_ISNUMERIC( ::transHandle )
          lResult := .F.
-         ::nLastError := ::transHandle
+         Eval( ErrorBlock(), FBErrorNew( ::transHandle ) )
       ELSE
          ::lActive := .T.
          lResult := .T.
+         ::DoAfterAction( FBTA_START )
       ENDIF
+   ELSE
+      Eval( ErrorBlock(), FBErrorNew( 1000, "Transaction is active" ) )
    ENDIF
    RETURN lResult
 
@@ -512,12 +549,16 @@ METHOD Commit() CLASS TFbTransaction
    LOCAL lResult := .F.
    LOCAL n
    IF ::lActive
+      ::DoBeforeAction( FBTA_COMMIT )
       IF ( n := FBCommit( ::transHandle ) ) < 0
-         ::nLastError := n
+         Eval( ErrorBlock(), FBErrorNew( n ) )
       ELSE
          lResult := .T.
+         ::lActive := .F.
+         ::DoAfterAction( FBTA_COMMIT )
       ENDIF
-      ::lActive := .F.
+   ELSE
+      Eval( ErrorBlock(), FBErrorNew( 1000, "Transaction is not active" ) )
    ENDIF
    RETURN lResult
 
@@ -525,13 +566,17 @@ METHOD CommitRetaining() CLASS TFbTransaction
    LOCAL lResult := .F.
    LOCAL n
    IF ::lActive
+      ::DoBeforeAction( FBTA_COMMITRETAINING )
       IF ( n := FBCommitRetaining( ::transHandle ) ) < 0
-         ::nLastError := n
          ::lActive := .F.
+         Eval( ErrorBlock(), FBErrorNew( n ) )
       ELSE
          ::lActive := .T.
          lResult := .T.
+         ::DoAfterAction( FBTA_COMMITRETAINING )
       ENDIF
+   ELSE
+      Eval( ErrorBlock(), FBErrorNew( 1000, "Transaction is not active" ) )
    ENDIF
    RETURN lResult
 
@@ -539,12 +584,16 @@ METHOD Rollback() CLASS TFbTransaction
    LOCAL lResult := .F.
    LOCAL n
    IF ::lActive
-      IF ( n := FBRollbackRetaining( ::transHandle ) ) < 0
-         ::nLastError := n
+      ::DoBeforeAction( FBTA_ROLLBACK )
+      IF ( n := FBRollback( ::transHandle ) ) < 0
+         Eval( ErrorBlock(), FBErrorNew( n ) )
       ELSE
          lResult := .T.
+         ::lActive := .F.
+         ::DoAfterAction( FBTA_ROLLBACK )
       ENDIF
-      ::lActive := .F.
+   ELSE
+      Eval( ErrorBlock(), FBErrorNew( 1000, "Transaction is not active" ) )
    ENDIF
    RETURN lResult
 
@@ -552,15 +601,63 @@ METHOD RollbackRetaining() CLASS TFbTransaction
    LOCAL lResult := .F.
    LOCAL n
    IF ::lActive
+      ::DoBeforeAction( FBTA_ROLLBACKRETAINING )
       IF ( n := FBRollbackRetaining( ::transHandle ) ) < 0
-         ::nLastError := n
          ::lActive := .F.
+         Eval( ErrorBlock(), FBErrorNew( n ) )
       ELSE
          ::lActive := .T.
          lResult := .T.
+         ::DoAfterAction( FBTA_ROLLBACK )
       ENDIF
+   ELSE
+      Eval( ErrorBlock(), FBErrorNew( 1000, "Transaction is not active" ) )
    ENDIF
    RETURN lResult
+
+METHOD SetDatabase( oValue ) CLASS TFbTransaction
+   IF ! ::Active
+      ::oDatabase := oValue
+   ELSE
+      Eval( ErrorBlock(), FBErrorNew( 1000, "Can not change database in active transaction" ) )
+   ENDIF
+   RETURN NIL
+
+METHOD SetParams( aValue ) CLASS TFbTransaction
+   IF ! ::Active
+      ::aParams := aValue
+   ELSE
+      Eval( ErrorBlock(), FBErrorNew( 1000, "Can not change params on active transaction" ) )
+   ENDIF
+   RETURN NIL
+
+METHOD SetActive( lValue ) CLASS TFbTransaction
+   IF lValue .AND. ! ::lActive
+      ::Start()
+   ELSEIF ! lValue .AND. ::Active
+      SWITCH ::DefaultAction
+      CASE FBTA_COMMIT
+         ::Commit()
+         EXIT
+      CASE FBTA_COMMITRETAINING
+         ::CommitRetaining()
+         EXIT
+      CASE FBTA_ROLLBACK
+         ::Rollback()
+         EXIT
+      CASE FBTA_ROLLBACKRETAINING
+         ::RollbackRetaining()
+      ENDSWITCH
+   ENDIF
+   RETURN NIL
+
+METHOD SetDefaultAction( nValue ) CLASS TFbTransaction
+   IF nValue >= FBTA_COMMIT .AND. nValue <= FBTA_ROLLBACKRETAINING
+      ::nDefaultAction := nValue
+   ELSE
+      Eval( ErrorBlock(), FBErrorNew( 1000, "Invalid value" ) )
+   ENDIF
+   RETURN NIL
    
 CREATE CLASS TFbQuery
 
@@ -645,10 +742,10 @@ METHOD Refresh() CLASS TFbQuery
    result := .T.
 
    IF HB_ISOBJECT( ::oTransaction )
-      IF ! ::oTransaction:lActive
+      IF ! ::oTransaction:Active
          ::oTransaction:Start()
       ENDIF
-      qry := FBQuery( ::db, ::query, ::dialect, ::oTransaction:transHandle )
+      qry := FBQuery( ::db, ::query, ::dialect, ::oTransaction:Handle )
    ELSE
       qry := FBQuery( ::db, ::query, ::dialect )
    ENDIF
@@ -1204,10 +1301,11 @@ CREATE CLASS TFBSQL
    VAR aQuery
    VAR nLastError   INIT 0
 
-   VISIBLE:
    VAR cSQL
    VAR oDatabase
    VAR oTransaction
+
+   VISIBLE:
    
    METHOD New( oDatabase, oTransaction, cSQL ) CONSTRUCTOR
    DESTRUCTOR Free()
@@ -1225,10 +1323,19 @@ CREATE CLASS TFBSQL
    METHOD FieldInfo( nIndex )
    METHOD FieldIndex( cFieldName )
    METHOD GetValue( xIndexOrName )
+
+   ACCESS Active      INLINE ( ::lActive )
+   ASSIGN Active      METHOD SetActive( lValue )
+   ACCESS Prepared    INLINE ( ! Empty( ::aQuery ) )
+   ACCESS LastError   INLINE ( ::nLastError )
    
-   ACCESS Active INLINE ( ::lActive )
-   ACCESS Prepared INLINE ( ! Empty( ::aQuery ) )
-   ACCESS LastError INLINE ( ::nLastError )
+   ACCESS SQL         INLINE ( ::cSQL )
+   ASSIGN SQL         METHOD SetSQL( cValue )
+   ACCESS Database    INLINE ( ::oDatabase )
+   ASSIGN Database    METHOD SetDatabase( oValue )
+   ACCESS Transaction INLINE ( ::oTransaction )
+   ASSIGN Transaction METHOD SetTransaction( oValue )
+   
 ENDCLASS
 
 METHOD New( oDatabase, oTransaction, cSQL ) CLASS TFBSQL
@@ -1244,26 +1351,25 @@ DESTRUCTOR Free() CLASS TFBSQL
 METHOD Prepare() CLASS TFBSQL
    LOCAL lRes := .F.
    IF Empty( ::aQuery ) .AND. ! Empty( ::oDatabase ) .AND. ! Empty( ::oTransaction ) .AND. HB_ISCHAR( ::cSQL )
-      ::aQuery := FBSQLCreate( ::oDatabase:db, ::cSQL, 3, ::oTransaction:transHandle )
+      ::aQuery := FBSQLCreate( ::oDatabase:db, ::cSQL, 3, ::oTransaction:Handle )
       IF HB_ISARRAY( ::aQuery )
          lRes := .T.
       ELSE
-         ::nLastError := ::aQuery
-         ::aQuery := NIL
+         Eval( ErrorBlock(), FBErrorNew( ::aQuery ) )
       ENDIF
+   ELSE
+      Eval( ErrorBlock(), FBErrorNew( 1000, "Invalid params" ) )
    ENDIF
    RETURN lRes
 
 METHOD Execute() CLASS TFBSQL   
    LOCAL nRes
    IF Empty( ::aQuery )
-      IF ! ::Prepare()
-         RETURN .F.
-      ENDIF
+      ::Prepare()
    ENDIF
    nRes := FBSQLExec( ::aQuery )
    IF nRes <> 0
-      ::nLastError := nRes
+      Eval( ErrorBlock(), FBErrorNew( nRes ) )
    ELSE
       IF ( ::aQuery[ 7 ] == ISC_INFO_SQL_STMT_SELECT ) .OR. ( ::aQuery[ 7 ] == ISC_INFO_SQL_STMT_SELECT_FOR_UPD )
          ::lActive := .T.
@@ -1274,11 +1380,11 @@ METHOD Execute() CLASS TFBSQL
 METHOD Fetch() CLASS TFBSQL
    LOCAL nRes
    IF Empty( ::aQuery )
-      RETURN .F.
+      Eval( ErrorBlock(), FBErrorNew( 1000, "Invalid query handle" ) )
    ENDIF
    nRes := FBFetch( ::aQuery )
    IF nRes <> 0 .AND. nRes <> -1
-      ::nLastError := nRes
+      Eval( ErrorBlock(), FBErrorNew( nRes ) )
    ENDIF
    RETURN nRes
 
@@ -1340,6 +1446,9 @@ METHOD FieldIndex( cFieldName ) CLASS TFBSQL
 
 METHOD GetValue( xIndexOrName ) CLASS TFBSQL
    LOCAL xRes := NIL
+   IF ! ::Prepared
+      Eval( ErrorBlock(), FBErrorNew( 1000, "Query is not active" ) )
+   ENDIF
    IF HB_ISCHAR( xIndexOrName )
       xIndexOrName := ::FieldIndex( xIndexOrName )
    ENDIF
@@ -1347,6 +1456,41 @@ METHOD GetValue( xIndexOrName ) CLASS TFBSQL
       xRes := FBSQLGetData( ::aQuery, xIndexOrName )
    ENDIF
    RETURN xRes
+
+METHOD SetActive( lValue ) CLASS TFBSQL
+   IF lValue .AND. ! ::lActive
+      IF ! ::Prepared
+         ::Prepare()
+      ENDIF
+      ::Execute()
+   ELSEIF ! lValue .AND. ::Prepared
+      ::Close()
+   ENDIF
+   RETURN NIL
+   
+METHOD SetSQL( cValue ) CLASS TFBSQL
+   IF ! ::Active
+      ::cSQL := cValue
+   ELSE
+      Eval( ErrorBlock(), FBErrorNew( 1000, "Can not permit this operation on active query" ) )
+   ENDIF
+   RETURN NIL
+
+METHOD SetDatabase( oValue ) CLASS TFBSQL
+   IF ! ::Active
+      ::oDatabase := oValue
+   ELSE
+      Eval( ErrorBlock(), FBErrorNew( 1000, "Can not permit this operation on active query" ) )
+   ENDIF
+   RETURN NIL
+
+METHOD SetTransaction( oValue ) CLASS TFBSQL
+   IF ! ::Active
+      ::oTransaction := oValue
+   ELSE
+      Eval( ErrorBlock(), FBErrorNew( 1000, "Can not permit this operation on active query" ) )
+   ENDIF
+   RETURN NIL
 
 CREATE CLASS TFBDataSet
 
@@ -1444,7 +1588,7 @@ ENDCLASS
 
 METHOD InitSQL() CLASS TFBDataSet
    IF HB_ISCHAR( ::cSelectSQL )
-      ::oSelectSQL:cSQL := ::cSelectSQL
+      ::oSelectSQL:SQL := ::cSelectSQL
       IF ! ::oSelectSQL:Prepare()
          RETURN .F.
       ENDIF
@@ -1452,19 +1596,19 @@ METHOD InitSQL() CLASS TFBDataSet
       RETURN .F.
    ENDIF
    IF HB_ISARRAY( ::aInsertSQL ) .AND. HB_ISCHAR( ::aInsertSQL[ 1 ] )
-      ::oInsertSQL:cSQL := ::aInsertSQL[ 1 ]
+      ::oInsertSQL:SQL := ::aInsertSQL[ 1 ]
       ::lCanInsert := ::oInsertSQL:Prepare()
    ENDIF
    IF HB_ISARRAY( ::aUpdateSQL ) .AND. HB_ISCHAR( ::aUpdateSQL[ 1 ] )
-      ::oUpdateSQL:cSQL := ::aUpdateSQL[ 1 ]
+      ::oUpdateSQL:SQL := ::aUpdateSQL[ 1 ]
       ::lCanUpdate := ::oUpdateSQL:Prepare()
    ENDIF
    IF HB_ISARRAY( ::aDeleteSQL ) .AND. HB_ISCHAR( ::aDeleteSQL[ 1 ] )
-      ::oDeleteSQL:cSQL := ::aDeleteSQL[ 1 ]
+      ::oDeleteSQL:SQL := ::aDeleteSQL[ 1 ]
       ::lCanDelete := ::oDeleteSQL:Prepare()
    ENDIF
    IF HB_ISARRAY( ::aRefreshSQL ) .AND. HB_ISCHAR( ::aRefreshSQL[ 1 ] )
-      ::oRefreshSQL:cSQL := ::aRefreshSQL[ 1 ]
+      ::oRefreshSQL:SQL := ::aRefreshSQL[ 1 ]
       ::lCanRefresh := ::oRefreshSQL:Prepare()
    ENDIF
    RETURN .T.
@@ -1856,3 +2000,18 @@ METHOD SetRefreshSQL( aValue ) CLASS TFBDataSet
    ENDIF
    RETURN NIL
 
+STATIC FUNCTION FBErrorNew( nErrorCode, cDescription, cOperation )
+   LOCAL oErr
+   oErr := ErrorNew()
+   oErr:subSystem := "HBFBIRD"
+   oErr:genCode := 0
+   oErr:subCode := nErrorCode
+   IF HB_ISCHAR( cDescription )
+      oErr:description := cDescription
+   ELSE
+      oErr:description := FBError( nErrorCode )
+   ENDIF
+   IF HB_ISCHAR( cOperation )
+      oErr:operation := cOperation
+   ENDIF
+   RETURN oErr

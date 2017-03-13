@@ -135,7 +135,14 @@
 #define SQL_DATE                           SQL_TIMESTAMP
 
 /* dataset states */
-#define FBDS_INACTIVE   0
-#define FBDS_BROWSE     1
-#define FBDS_EDIT       2
-#define FBDS_APPEND     3
+#define FBDS_INACTIVE                     0
+#define FBDS_BROWSE                       1
+#define FBDS_EDIT                         2
+#define FBDS_APPEND                       3
+
+/* transaction DEFAULT action and event info */
+#define FBTA_START                        1
+#define FBTA_COMMIT                       2
+#define FBTA_COMMITRETAINING              3
+#define FBTA_ROLLBACK                     4
+#define FBTA_ROLLBACKRETAINING            5
