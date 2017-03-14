@@ -90,7 +90,7 @@ FUNCTION FBBrowse( oDtset, nTop, nLeft, nBottom, nRight )
    oBrw:GoBottomBlock := { || oDataset:GoBottom() }
 
    FOR n := 1 TO oDataset:FieldCount()
-      cColumnBlock := '{ || oDataset:GetValue("' + oDataset:FieldInfo( n )[ 1 ] + '") }'
+      cColumnBlock := '{ |xVal| iif( Empty(xVal), oDataset:GetValue("' + oDataset:FieldInfo( n )[ 1 ] + '"), oDataset:SetValue("' + oDataset:FieldInfo( n )[ 1 ] + '", xVal ) ) }'
       oBrw:AddColumn( TBColumnNew( oDataset:FieldInfo( n )[ 1 ], &cColumnBlock ) )
    NEXT
 
@@ -339,6 +339,8 @@ STATIC FUNCTION DoGet( oBrw, lAppend, oDataset )
    IF ReadModal( { oGet } )
       IF lAppend
          oDataset:Append()
+      ELSE
+         oDataset:Edit()
       ENDIF
       Eval( oCol:Block, xValue )
 /*

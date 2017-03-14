@@ -117,8 +117,8 @@ FUNCTION Main()
       oDS:SetValue( 2, - 2 * nI )
 
       oDS:SetValue( 3, "TESTŁÓĄ" )
-      oDS:SetValue( 4, 1 )
-      oDS:SetValue( 5, 1.37 * nI )
+      oDS[ 4 ] := 1
+      oDS[ 5 ] := 1.37 * nI
       oDS:SetValue( 6, 10.45 * nI )
       oDS:SetValue( 7, 15.2 * nI )
       oDS:SetValue( 8, 7.57 * nI )
@@ -146,6 +146,7 @@ FUNCTION Main()
  ? "Prepare 4# SQL (CREATE TABLE....)"
    oDS:SelectSQL := "select * from test"
    oDS:DeleteSQL := { "delete from test where code = ?", "CODE" }
+   oDS:UpdateSQL := { "update test set dept = ?, Name = ?, Sales = ?, Tax = ?, Salary = ?, Budget = ?, Discount = ?, Creation = ? where code = ?", { "dept", "Name", "Sales", "Tax", "Salary", "Budget", "Discount", "Creation", "code" } }
    ? "Prepare..."
    oDS:Open()
    ? "Field count: ", oDS:FieldCount()
@@ -161,6 +162,10 @@ FUNCTION Main()
          ? "-----------------------------------------------------------"
          ? oDS:FieldInfo( nI )[ 1 ], ":", oDS:GetValue( nI )
       NEXT
+      
+      ? oDS[ 'code' ]
+      ? oDS[ 2 ]
+      
       oDS:Skip(1)
    ENDDO
    oDS:GoTop()
