@@ -2,6 +2,7 @@
  * Firebird RDBMS low level (client api) interface code.
  *
  * Copyright 2003 Rodrigo Moreno rodrigo_moreno@yahoo.com
+ *           2017 Michal Gawrycki ( info / gmsystems/ pl )
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -112,6 +113,12 @@ static isc_db_handle hb_FB_db_handle_par( int iParam )
 
    return ph ? *ph : 0;
 }
+
+static const HB_GC_FUNCS s_gcQuad =
+{
+   hb_gcDummyClear,
+   hb_gcDummyMark
+};
 
 /* API wrappers */
 
@@ -1156,15 +1163,16 @@ HB_FUNC( FBSQLCREATE )
       hb_arraySetNL( qry_handle, 4, ( long ) num_cols );
       hb_arraySetNI( qry_handle, 5, ( int ) dialect );
       hb_arraySetForward( qry_handle, 6, aNew );
-     
+
       /* Statement type */
       hb_arraySetNI( qry_handle, 7, ( int ) stmttype );
-      /* Query params */      
+      /* Query params */
       hb_arraySetPtr( qry_handle, 8, ( void * ) ( HB_PTRUINT ) parsqlda );
       hb_arraySetForward( qry_handle, 9, aNewPar );
       
       hb_itemReturnRelease( qry_handle );
       hb_itemRelease( aNew );
+      hb_itemRelease( aNewPar );
    }
    else
       hb_errRT_BASE( EG_ARG, 2020, NULL, HB_ERR_FUNCNAME, HB_ERR_ARGS_BASEPARAMS ); 
@@ -1187,25 +1195,37 @@ HB_FUNC( FBSQLEXEC )
       {
          case isc_info_sql_stmt_select:
          case isc_info_sql_stmt_select_for_upd:
+
             if( isc_dsql_execute2( status, &trans, &stmt, dialect, insqlda, NULL ) )
             {
                hb_retnl( isc_sqlcode( status ) );
                return;
             }
+            
+            /* set cursor name */
+            if ( ( hb_parinfo( 0 ) > 1 ) && ( hb_parcx( 2 ) ) )
+            {
+               if( isc_dsql_set_cursor_name( status, &stmt, hb_parcx( 2 ), 0 ) )
+               {
+                  hb_retnl( isc_sqlcode( status ) );
+                  return;
+               }
+            }
+            
             break;
          case isc_info_sql_stmt_exec_procedure:
             if( isc_dsql_execute2( status, &trans, &stmt, dialect, insqlda, sqlda ) )
             {
                hb_retnl( isc_sqlcode( status ) );
                return;
-            }            
+            }
             break;
          default:
             if( isc_dsql_execute( status, &trans, &stmt, dialect, insqlda ) )
             {
                hb_retnl( isc_sqlcode( status ) );
                return;
-            }         
+            }
             break;
       }
       hb_retnl(0);
@@ -1222,8 +1242,8 @@ HB_FUNC( FBSQLSETPARAM )
    {
       XSQLVAR *        var;
       XSQLDA *         sqlda = ( XSQLDA * ) hb_itemGetPtr( hb_itemArrayGet( aParam, 8 ) );
-      //ISC_QUAD *       blob_id;
-      
+      ISC_QUAD *       blob_id;
+
       PHB_ITEM         xValue = hb_param( 3, HB_IT_ANY );
 
       int pos = hb_parni( 2 ) - 1;
@@ -1332,6 +1352,14 @@ HB_FUNC( FBSQLSETPARAM )
                hb_xrealloc( var->sqldata, hb_itemGetCLen( xValue ) );
                memcpy(var->sqldata, hb_itemGetCPtr( xValue ), hb_itemGetCLen( xValue ) );
                break;
+            case HB_IT_POINTER:
+               // ISC_QUAD - BLOB
+               var->sqltype = SQL_BLOB | ( var->sqltype & 1 );
+               var->sqllen = sizeof( ISC_QUAD );
+               blob_id = (ISC_QUAD * ) hb_itemGetPtr( xValue );
+               hb_xrealloc( var->sqldata, sizeof( ISC_QUAD ) );
+               memcpy( var->sqldata, blob_id, sizeof( ISC_QUAD ) );
+               break;
             default:
                hb_retnl(-1);
                return;
@@ -1411,8 +1439,10 @@ HB_FUNC( FBSQLGETDATA )
                break;
 
             case SQL_BLOB:
-               blob_id = ( ISC_QUAD * ) var->sqldata;
-               hb_retptr( ( void * ) blob_id );
+            case SQL_QUAD:
+               blob_id = hb_gcAllocate( sizeof( ISC_QUAD ), &s_gcQuad );
+               memcpy( blob_id, var->sqldata, sizeof( ISC_QUAD ) );
+               hb_retptrGC( blob_id );
                break;
 
             case SQL_SHORT:
@@ -1499,4 +1529,202 @@ HB_FUNC( FBSQLGETDATA )
          }
       }
    }
+}
+
+HB_FUNC( FBBLOBWRITERCREATE )
+{
+   isc_db_handle    db = hb_FB_db_handle_par( 1 );
+   ISC_QUAD *       blob_id = NULL;
+   ISC_STATUS_ARRAY status;
+   PHB_ITEM         aRes;
+   isc_tr_handle    trans = ( isc_tr_handle ) ( HB_PTRUINT ) hb_parptr( 2 );
+   isc_blob_handle  blob_handle = NULL;
+   
+   if( db && trans )
+   {
+
+      blob_id = ( ISC_QUAD * ) hb_gcAllocate( sizeof( ISC_QUAD ), &s_gcQuad );
+      
+      if ( isc_create_blob2( status, &db, &trans, &blob_handle, blob_id, 0, NULL ) )
+      {
+         hb_gcFree( blob_id );
+         hb_retnl( isc_sqlcode( status ) );
+         return;
+      }
+      
+      aRes = hb_itemArrayNew( 2 );
+      
+      hb_arraySetPtrGC( aRes, 1, ( void * ) ( HB_PTRUINT ) blob_id );
+      hb_arraySetPtr( aRes, 2, ( void * ) ( HB_PTRUINT ) blob_handle );
+      
+      hb_itemReturnRelease( aRes );
+   }
+   else
+      hb_errRT_BASE( EG_ARG, 2020, NULL, HB_ERR_FUNCNAME, HB_ERR_ARGS_BASEPARAMS );
+}
+
+HB_FUNC( FBBLOBWRITERWRITE )
+{
+   PHB_ITEM aParam = hb_param( 1, HB_IT_ARRAY );
+   
+   if ( aParam ) {
+      const char *     data = hb_parc( 2 );
+      int              len = hb_parni( 3 );
+      isc_blob_handle  blob_handle = NULL;
+      ISC_STATUS_ARRAY status;
+
+      if ( !len )
+      {
+         len = hb_parclen( 2 );
+      }
+      
+      blob_handle = ( isc_blob_handle * ) hb_arrayGetPtr( aParam, 2 );
+      
+      if ( blob_handle )
+      {
+         if ( isc_put_segment( status, &blob_handle, len, data ) )
+         {
+            hb_retnl( isc_sqlcode( status ) );
+            return;
+         }
+         
+         hb_retl( HB_TRUE );         
+      }
+      else
+         hb_retnl( 1 );
+   }
+   else
+      hb_errRT_BASE( EG_ARG, 2020, NULL, HB_ERR_FUNCNAME, HB_ERR_ARGS_BASEPARAMS );
+}
+
+HB_FUNC( FBBLOBREADERCREATE )
+{
+   isc_db_handle    db = hb_FB_db_handle_par( 1 );
+   ISC_QUAD *       blob_id = ( ISC_QUAD * ) hb_parptrGC( &s_gcQuad, 3 );
+   ISC_STATUS_ARRAY status;
+   PHB_ITEM         aRes = NULL;
+   isc_tr_handle    trans = ( isc_tr_handle ) ( HB_PTRUINT ) hb_parptr( 2 );
+   isc_blob_handle  blob_handle = NULL;
+   
+   if( db && trans && blob_id )
+   {
+      
+      if ( isc_open_blob2( status, &db, &trans, &blob_handle, blob_id, 0, NULL ) )
+      {
+         hb_gcFree( blob_id );
+         hb_retnl( isc_sqlcode( status ) );
+         return;
+      }
+      
+      char blob_items[] = {
+         isc_info_blob_num_segments,
+         isc_info_blob_max_segment,
+         isc_info_blob_total_length,
+         isc_info_blob_type };
+      
+      char res_buffer[64], *p, item;
+      short length;
+      
+      if ( isc_blob_info( status, &blob_handle, sizeof( blob_items ), blob_items, sizeof( res_buffer ), res_buffer ) )
+      {
+         hb_gcFree( blob_id );
+         hb_retnl( isc_sqlcode( status ) );
+         return;         
+      }
+
+      aRes = hb_itemArrayNew( 6 );
+
+      for ( p = res_buffer; *p != isc_info_end ; )
+      {
+         item = *p++;
+         length = ( short ) isc_vax_integer( p, 2 );
+         p += 2;
+         switch (item)
+         {
+            case isc_info_blob_num_segments:
+               hb_arraySetNL( aRes, 3, isc_vax_integer( p, length ) );
+               break;
+            case isc_info_blob_max_segment:
+               hb_arraySetNL( aRes, 4, isc_vax_integer( p, length ) );
+               break;
+            case isc_info_blob_total_length:
+               hb_arraySetNL( aRes, 5, isc_vax_integer( p, length ) );
+               break;
+            case isc_info_blob_type:
+               hb_arraySetNL( aRes, 6, isc_vax_integer( p, length ) );
+               break;
+            case isc_info_truncated:
+               hb_gcFree( blob_id );
+               hb_itemRelease( aRes );
+               hb_retnl( isc_info_truncated );
+               return;
+               break;
+         }
+         p += length;
+      }
+
+      hb_arraySetPtrGC( aRes, 1, ( void * ) ( HB_PTRUINT ) blob_id );
+      hb_arraySetPtr( aRes, 2, ( void * ) ( HB_PTRUINT ) blob_handle );
+      
+      hb_itemReturnRelease( aRes );
+   }
+   else
+      hb_errRT_BASE( EG_ARG, 2020, NULL, HB_ERR_FUNCNAME, HB_ERR_ARGS_BASEPARAMS );
+}
+
+HB_FUNC( FBBLOBREADERREAD )
+{
+   PHB_ITEM aParam = hb_param( 1, HB_IT_ARRAY );
+   
+   if ( aParam ) {
+      int              len = hb_parni( 2 );
+      isc_blob_handle  blob_handle = ( isc_blob_handle ) hb_arrayGetPtr( aParam, 2 );
+      ISC_STATUS_ARRAY status;
+      char *           data;
+      unsigned short   data_len;
+
+      if ( blob_handle )
+      {
+         data = hb_xgrab( len + 1 );
+         if ( isc_get_segment( status, &blob_handle, &data_len, len, data ) )
+         {
+            hb_retnl( isc_sqlcode( status ) );
+            return;
+         }
+         
+         hb_retclen( data, data_len );
+         
+      }
+      else
+         hb_errRT_BASE( EG_ARG, 2020, NULL, HB_ERR_FUNCNAME, HB_ERR_ARGS_BASEPARAMS );
+   }
+   else
+      hb_errRT_BASE( EG_ARG, 2020, NULL, HB_ERR_FUNCNAME, HB_ERR_ARGS_BASEPARAMS );
+   
+}
+
+HB_FUNC( FBBLOBCLOSE )
+{
+   PHB_ITEM aParam = hb_param( 1, HB_IT_ARRAY );
+   
+   if ( aParam ) {
+
+      isc_blob_handle  blob_handle = ( isc_blob_handle ) hb_arrayGetPtr( aParam, 2 );
+      ISC_STATUS_ARRAY status;
+      
+      if ( blob_handle )
+      {
+         if ( isc_close_blob( status, &blob_handle ) )
+         {
+            hb_retnl( isc_sqlcode( status ) );
+            return;            
+         }
+
+         hb_retl( HB_TRUE );
+      }
+      else
+         hb_errRT_BASE( EG_ARG, 2020, NULL, HB_ERR_FUNCNAME, HB_ERR_ARGS_BASEPARAMS );   
+   }
+   else
+      hb_errRT_BASE( EG_ARG, 2020, NULL, HB_ERR_FUNCNAME, HB_ERR_ARGS_BASEPARAMS );
 }

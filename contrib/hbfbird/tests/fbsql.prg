@@ -8,6 +8,8 @@ FUNCTION Main()
    LOCAL oDatabase
    LOCAL oTransaction
    LOCAL oSQL
+   LOCAL oBW
+   LOCAL oBR
    
    LOCAL cServer := "localhost:"
    LOCAL cDatabase
@@ -21,6 +23,11 @@ FUNCTION Main()
    LOCAL cQuery
    LOCAL nI
    LOCAL nJ
+   LOCAL cStr
+   
+   //ErrorBlock( {| oError | FbDefError( oError ) } )
+   
+   //AltD()
 
    hb_langselect('PL')
    hb_cdpselect("UTF8")
@@ -97,7 +104,7 @@ FUNCTION Main()
    oTransaction:CommitRetaining()
    
    ? "Prepare 3# SQL (inserts)"
-   oSQL:SQL := "insert into test (Code, dept, Name, Sales, Tax, Salary, Budget, Discount, Creation, Description) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+   oSQL:SQL := "insert into test (Code, dept, Name, Sales, Tax, Salary, Budget, Discount, Creation, Description) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) returning code, name"
    ? "Prepare..."
    IF ! oSQL:Prepare()
       ? "Error: " + Str( oSQL:LastError )
@@ -106,6 +113,8 @@ FUNCTION Main()
    ENDIF
    ? "Param count: ", oSQL:ParamCount()
    
+   
+   cStr := ""
    ? "Execute inserts"
    FOR nI := 1 TO 10
       ? "Setting params...", nI
@@ -121,7 +130,11 @@ FUNCTION Main()
       oSQL:SetParam( 9, Date() )
 
       /* BLOB */
-      oSQL:SetParam( 10, NIL )
+      oBW := TFbBlobWriter():New( oDatabase, oTransaction )
+      cStr := cStr + "ABCD"
+      oBW:Write( cStr, Len( cStr ) )
+      oBW:Close()
+      oSQL:SetParam( 10, oBW:Quad )
       
       
       ? "Executing insert...", nI
@@ -130,6 +143,8 @@ FUNCTION Main()
          ? FBError( oSQL:LastError )
          QUIT
       ENDIF
+      ? "Returning: ", oSQL:GetValue( 1 ), oSQL:GetValue( 2 )
+      oBW := NIL
    NEXT
 
    oSQL:Close()
@@ -157,6 +172,20 @@ FUNCTION Main()
       FOR nI := 1 TO oSQL:FieldCount()
          ? "-----------------------------------------------------------"
          ? oSQL:FieldInfo( nI )[ 1 ], ":", oSQL:GetValue( nI )
+         
+         IF oSQL:FieldInfo( nI )[ 2 ] == SQL_BLOB
+            ? "BLOB: "
+            oBR := TFbBlobReader():New( oDatabase, oTransaction, oSQL:GetValue( nI ) )
+            ? "Max seg: ", oBR:MaxSegment
+            ? "Num seg: ", oBR:NumSegments
+            ? "Len: ", oBR:TotalLength
+            ? "Type: ", oBR:BlobType
+            cStr = oBR:Read( oBR:TotalLength )
+            oBR:Close()
+            oBR := NIL
+            ? "Data: ", cStr
+         ENDIF
+         
       NEXT
    ENDDO
    
@@ -168,4 +197,18 @@ FUNCTION Main()
    RETURN 0
 
 /*----------------------------------------------------------------------*/
+/*
+STATIC FUNCTION FbDefError( )
+   LOCAL n := 1
+   DO WHILE ! Empty( ProcName( ++n ) )
 
+      OutErr( hb_eol() )
+      OutErr( hb_StrFormat( "Called from %1$s(%2$d)  ", ;
+              ProcName( n ), ;
+              ProcLine( n ) ) )
+
+   ENDDO
+   ErrorLevel( 1 )
+   QUIT
+   RETURN .F.
+*/

@@ -2,6 +2,7 @@
  * Firebird RDBMS low level (client api) interface code.
  *
  * Copyright 2003 Rodrigo Moreno rodrigo_moreno@yahoo.com
+ *           2017 Michal Gawrycki ( info / gmsystems / pl )
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -1344,6 +1345,8 @@ CREATE CLASS TFbSQL
    VAR cSQL
    VAR oDatabase
    VAR oTransaction
+   
+   VAR cCursorName
 
    VISIBLE:
    
@@ -1358,11 +1361,13 @@ CREATE CLASS TFbSQL
    METHOD ParamCount()
    METHOD ParamInfo( nIndex )
    METHOD SetParam( nIndex, xValue )
+   METHOD SetParams( aParams )
    
    METHOD FieldCount()
    METHOD FieldInfo( nIndex )
    METHOD FieldIndex( cFieldName )
    METHOD GetValue( xIndexOrName )
+   METHOD GetRow( lAsHash )
 
    ACCESS Active      INLINE ( ::lActive )
    ASSIGN Active      METHOD SetActive( lValue )
@@ -1376,6 +1381,11 @@ CREATE CLASS TFbSQL
    ACCESS Transaction INLINE ( ::oTransaction )
    ASSIGN Transaction METHOD SetTransaction( oValue )
    
+   ACCESS CursorName  INLINE ( ::cCursorName )
+   ASSIGN CursorName  METHOD SetCursorName( cValue )
+   
+   OPERATOR "[]" ARG xIndex INLINE iif( PCount() > 2, ::SetParam( xIndex, hb_PValue( 3 ) ), ::GetValue( xIndex ) )
+   
 ENDCLASS
 
 METHOD New( oDatabase, oTransaction, cSQL ) CLASS TFbSQL
@@ -1383,6 +1393,7 @@ METHOD New( oDatabase, oTransaction, cSQL ) CLASS TFbSQL
    ::oDatabase := oDatabase
    ::oTransaction := oTransaction
    ::cSQL := cSQL
+   ::cCursorName := 'HBSQL' + NetName() + AllTrim( Str( Random() ) ) + AllTrim( Str( Random() ) )
 
    RETURN Self
 
@@ -1415,12 +1426,22 @@ METHOD Prepare() CLASS TFbSQL
 METHOD Execute() CLASS TFbSQL
 
    LOCAL nRes
+   LOCAL cCurName
    
    IF Empty( ::aQuery )
       ::Prepare()
    ENDIF
    
-   nRes := FBSQLExec( ::aQuery )
+   IF ( ( ::aQuery[ 7 ] == ISC_INFO_SQL_STMT_SELECT ) .OR. ( ::aQuery[ 7 ] == ISC_INFO_SQL_STMT_SELECT_FOR_UPD ) ) ;
+      .AND. HB_ISCHAR( ::cCursorName ) .AND. Len( ::cCursorName ) > 0
+      
+      cCurName := ::cCursorName
+      
+   ELSE
+      cCurName := NIL
+   ENDIF
+
+   nRes := FBSQLExec( ::aQuery, cCurName )
    
    IF nRes <> 0
       Eval( ErrorBlock(), FBErrorNew( nRes ) )
@@ -1491,6 +1512,19 @@ METHOD SetParam( nIndex, xValue ) CLASS TFbSQL
 
    RETURN lRes
 
+METHOD SetParams( aParams ) CLASS TFbSQL
+
+   LOCAL lRes := .F., n
+   
+   IF HB_ISARRAY( aParams ) .AND. ( Len( aParams ) == ::ParamCount() )
+      FOR n := 1 TO Len( aParams )
+         ::SetParam( n, aParams[ n ] )
+      NEXT
+      lRes := .T.
+   ENDIF
+
+   RETURN lRes
+
 METHOD FieldCount() CLASS TFbSQL
 
    LOCAL nRes := 0
@@ -1540,6 +1574,27 @@ METHOD GetValue( xIndexOrName ) CLASS TFbSQL
    ENDIF
    RETURN xRes
 
+METHOD GetRow( lAsHash ) CLASS TFbSQL
+
+   LOCAL aRow
+   LOCAL n
+   
+   hb_default( @lAsHash, .F. )
+   
+   IF lAsHash
+      aRow := hb_Hash()
+      FOR n := 1 TO ::FieldCount()
+         aRow[ ::FieldInfo( n )[ 1 ] ] := ::GetValue( n )
+      NEXT
+   ELSE
+      aRow := Array( ::FieldCount() )
+      FOR n := 1 TO ::FieldCount()
+         aRow[ n ] := ::GetValue( n )
+      NEXT      
+   ENDIF
+   
+   RETURN aRow
+
 METHOD SetActive( lValue ) CLASS TFbSQL
 
    IF lValue .AND. ! ::lActive
@@ -1586,6 +1641,153 @@ METHOD SetTransaction( oValue ) CLASS TFbSQL
 
    RETURN NIL
 
+METHOD SetCursorName( cValue ) CLASS TFbSQL
+
+   IF ! ::Active
+      ::cCursorName := cValue
+   ELSE
+      Eval( ErrorBlock(), FBErrorNew( 1000, "Can not permit this operation on active query" ) )
+   ENDIF
+
+   RETURN NIL
+
+CREATE CLASS TFbBlobReader
+
+   HIDDEN:
+   
+   VAR   aBlob
+   VAR   lActive   INIT .F.
+   
+   VISIBLE:
+   
+   METHOD New( oDatabase, oTransaction, pQuad ) CONSTRUCTOR
+   DESTRUCTOR Free()
+   
+   METHOD Read( nLength )
+   METHOD Close()
+   
+   ACCESS Active      INLINE ( ::lActive )
+   ACCESS NumSegments INLINE ( ::aBlob[ 3 ] )
+   ACCESS MaxSegment  INLINE ( ::aBlob[ 4 ] )
+   ACCESS TotalLength INLINE ( ::aBlob[ 5 ] )
+   ACCESS BlobType    INLINE ( ::aBlob[ 6 ] )
+
+ENDCLASS
+
+METHOD New( oDatabase, oTransaction, pQuad ) CLASS TFbBlobReader
+
+   ::aBlob := FbBlobReaderCreate( oDatabase:db, oTransaction:Handle, pQuad )
+   
+   IF ! HB_ISARRAY( ::aBlob )
+      Eval( ErrorBlock(), FBErrorNew( ::aBlob ) )
+   ENDIF
+
+   ::lActive := .T.
+   
+   RETURN Self
+   
+DESTRUCTOR Free() CLASS TFbBlobReader
+
+   IF ::Active
+      ::Close()
+   ENDIF
+
+   RETURN
+
+METHOD Read( nLength ) CLASS TFbBlobReader
+
+   LOCAL cRes
+   
+   cRes := FbBlobReaderRead( ::aBlob, nLength )
+   
+   IF HB_ISNUMERIC( cRes )
+      Eval( ErrorBlock(), FBErrorNew( cRes ) )
+   ENDIF
+   
+   RETURN cRes
+
+METHOD Close() CLASS TFbBlobReader
+
+   LOCAL xRes
+   
+   xRes := FbBlobClose( ::aBlob )
+   IF ! HB_ISLOGICAL( xRes )
+      Eval( ErrorBlock(), FBErrorNew( xRes ) )
+   ENDIF
+
+   ::lActive := .F.
+
+   RETURN .T.
+
+CREATE CLASS TFbBlobWriter
+
+   HIDDEN:
+   
+   VAR   aBlob
+   VAR   nWriten   INIT 0
+   VAR   lActive
+   
+   VISIBLE:
+   
+   METHOD New( oDatabase, oTransaction ) CONSTRUCTOR
+   DESTRUCTOR Free()
+   
+   METHOD Write( cData, nLength )
+   METHOD Close()
+   
+   ACCESS Active      INLINE ( ::lActive )
+   ACCESS WriteSize   INLINE ( ::nWriten )
+   ACCESS Quad        INLINE ( ::aBlob[ 1 ] )
+
+ENDCLASS
+
+METHOD New( oDatabase, oTransaction ) CLASS TFbBlobWriter
+
+   ::aBlob := FbBlobWriterCreate( oDatabase:db, oTransaction:Handle )
+   
+   IF ! HB_ISARRAY( ::aBlob )
+      Eval( ErrorBlock(), FBErrorNew( ::aBlob ) )
+   ENDIF
+
+   ::lActive := .T.
+
+   RETURN Self
+   
+DESTRUCTOR Free() CLASS TFbBlobWriter
+
+   IF ::Active
+      ::Close()
+   ENDIF
+
+   RETURN
+
+METHOD Write( cData, nLength ) CLASS TFbBlobWriter
+
+   LOCAL cRes
+   
+   cRes := FbBlobWriterWrite( ::aBlob, cData, nLength )
+   
+   IF HB_ISNUMERIC( cRes )
+      Eval( ErrorBlock(), FBErrorNew( cRes ) )
+   ENDIF
+   
+   ::nWriten := ::nWriten + nLength
+   
+   RETURN cRes
+
+METHOD Close() CLASS TFbBlobWriter
+
+   LOCAL xRes
+   
+   xRes := FbBlobClose( ::aBlob )
+   IF ! HB_ISLOGICAL( xRes )
+      Eval( ErrorBlock(), FBErrorNew( xRes ) )
+   ENDIF
+
+   ::lActive := .F.
+
+   RETURN .T.
+
 CREATE CLASS TFbDataSet
 
    HIDDEN:
@@ -1612,7 +1814,7 @@ CREATE CLASS TFbDataSet
    VAR   nCurRow      INIT 0
    VAR   nState       INIT FBDS_INACTIVE
    VAR   aEditRow     INIT {}
-   VAR   nDeletedRows INIT 0
+   VAR   lEditRowChanged INIT .F.
    
    VAR   lSQLEof      INIT .T.
    
@@ -1652,7 +1854,7 @@ CREATE CLASS TFbDataSet
    METHOD FieldInfo( ncIndex )
    METHOD GetValue( ncIndex )
    METHOD SetValue( ncIndex, xValue, lIsRefresh )
-   
+   METHOD DefaulValue( ncIndex )
 
    ACCESS Database INLINE ( ::oDatabase )
    ASSIGN Database METHOD SetDatabase( oValue )
@@ -1675,10 +1877,12 @@ CREATE CLASS TFbDataSet
    ACCESS RefreshSQL INLINE ( ::aRefreshSQL )
    ASSIGN RefreshSQL METHOD SetRefreshSQL( aValue )
    
-   ACCESS RecordCount INLINE ( ( Len( ::aRows ) - ::nDeletedRows ) )
+   ACCESS RecordCount INLINE ( ( Len( ::aRows ) + iif( ::nState == FBDS_APPEND, 1, 0 ) ) )
+   
+   VAR    UseDefaultValue   INIT .F.
    
    OPERATOR "[]" ARG xIndex INLINE iif( PCount() > 2, ::SetValue( xIndex, hb_PValue( 3 ) ), ::GetValue( xIndex ) )
-   
+
 ENDCLASS
 
 METHOD InitSQL() CLASS TFbDataSet
@@ -1738,12 +1942,8 @@ METHOD FetchRecord() CLASS TFbDataSet
          aRow[ nI ] := ::oSelectSQL:GetValue( nI )
       NEXT
 
-      IF ::nDeletedRows > 0
-         ::aRows[ Len( ::aRows ) + 1 ] := aRow
-         ::nDeletedRows--
-      ELSE
-         AAdd( ::aRows, aRow )
-      ENDIF
+      AAdd( ::aRows, aRow )
+      
    ENDIF   
 
    RETURN lRes
@@ -1817,11 +2017,7 @@ METHOD Eof() CLASS TFbDataSet
    LOCAL lRes := .F.
    
    IF ::Active
-      IF ::State <> FBDS_BROWSE
-         ::Post()
-      ENDIF
-      
-      lRes := ::lSQLEof .AND. ::nCurRow == ::RecordCount
+      lRes := ( ::lSQLEof .AND. ::nCurRow == ::RecordCount ) .OR. ( ::nCurRow == 0 )
    ENDIF
    
    RETURN lRes
@@ -1831,10 +2027,7 @@ METHOD Bof() CLASS TFbDataSet
    LOCAL lRes := .F.
    
    IF ::Active
-      IF ::State <> FBDS_BROWSE
-         ::Post()
-      ENDIF
-      lRes := ::nCurRow == 1
+      lRes := ( ::nCurRow == 1 ) .OR. ( ::nCurRow == 0 )
    ENDIF
 
    RETURN lRes
@@ -1853,6 +2046,7 @@ METHOD Skip( nRecs ) CLASS TFbDataSet
       hb_default( @nRecs, 1 )
 
       IF nRecs > 0
+         
          IF nRecs + ::nCurRow <= ::RecordCount
             ::nCurRow := ::nCurRow + nRecs
             nSkipped := nRecs
@@ -1868,16 +2062,17 @@ METHOD Skip( nRecs ) CLASS TFbDataSet
                   ELSE
                      ::lSQLEof := .T.
                      EXIT
-                  ENDIF
+                  ENDIF                  
                NEXT
             ENDIF
          ENDIF
-      ELSE
-         IF ( nRecs < 0 ) .AND. ( ::RecordCount > 0 )
+      ELSEIF ( nRecs < 0 ) .AND. ( ::RecordCount > 0 )
+         IF -nRecs > ::nCurRow
+            nSkipped := ::nCurRow + ( nRecs + ::nCurRow)
+            ::nCurRow := 1
+         ELSE
             ::nCurRow := ::nCurRow + nRecs
-            IF ::nCurRow < 1
-               ::nCurRow := 1
-            ENDIF
+            nSkipped := nRecs
          ENDIF
       ENDIF
    ENDIF
@@ -1893,13 +2088,16 @@ METHOD GoTop() CLASS TFbDataSet
    LOCAL lRes := .F.
 
    IF ::Active
+
       IF ::nState <> FBDS_BROWSE
          ::Post()
       ENDIF
+
       IF ::RecordCount > 0
          ::nCurRow := 1
          lRes := .T.
       ENDIF
+
    ENDIF
 
    RETURN lRes
@@ -1921,7 +2119,9 @@ METHOD GoBottom() CLASS TFbDataSet
       ENDIF
 
       ::nCurRow := ::RecordCount
+
       lRes := .T.
+
    ENDIF
 
    RETURN lRes
@@ -1952,6 +2152,7 @@ METHOD Edit() CLASS TFbDataSet
       IF ::RecordCount > 0 .AND. ::nCurRow > 0
          ::aEditRow := ::aRows[ ::nCurRow ]
          ::nState := FBDS_EDIT
+         ::lEditRowChanged := .F.
          lRes := .T.
       ELSE
          lRes := ::Append()
@@ -1970,32 +2171,16 @@ METHOD Append() CLASS TFbDataSet
 
       ::aEditRow := Array( ::FieldCount() )
 
-      FOR n := 1 TO ::FieldCount()
-
-         SWITCH ::FieldInfo( n )[ 2 ]
-         CASE SQL_TEXT
-         CASE SQL_VARYING
-            ::aEditRow[ n ] := ""
-            EXIT
-         CASE SQL_SHORT
-         CASE SQL_LONG
-         CASE SQL_FLOAT
-         CASE SQL_DOUBLE
-         CASE SQL_D_FLOAT
-         CASE SQL_INT64
-            ::aEditRow[ n ] := 0
-            EXIT
-         CASE SQL_TIMESTAMP
-         CASE SQL_TYPE_TIME
-         CASE SQL_TYPE_DATE
-            ::aEditRow[ n ] := 0 // ???
-            EXIT
-         ENDSWITCH
-
-      NEXT
+      IF ::UseDefaultValue
+         FOR n := 1 TO ::FieldCount()
+           ::aEditRow[ n ] := ::DefaulValue( n ) 
+         NEXT
+      ENDIF
 
       ::nState := FBDS_APPEND
-      ::nCurRow := ::RecordCount + 1
+      ::nCurRow := ::RecordCount
+      ::lEditRowChanged := .F.
+      
       lRes := .T.
    ENDIF
 
@@ -2005,7 +2190,7 @@ METHOD Post() CLASS TFbDataSet
 
    LOCAL lRes := .F.
    
-   IF ::Active .AND. ( ::State == FBDS_EDIT .OR. ::State == FBDS_APPEND )
+   IF ::Active .AND. ( ::State == FBDS_EDIT .OR. ::State == FBDS_APPEND ) .AND. ::lEditRowChanged
 
       SWITCH ::State
       CASE FBDS_EDIT
@@ -2018,16 +2203,15 @@ METHOD Post() CLASS TFbDataSet
          IF ::lCanInsert
             lRes := ::UpdateParams( ::oInsertSQL, ::aInsertSQL[ 2 ] ) .AND. ::oInsertSQL:Execute()
          ENDIF
-         IF ::nDeletedRows > 0
-            ::aRows[ ::RecordCount + 1 ] := ::aEditRow
-            ::nDeletedRows := ::nDeletedRows - 1
-         ELSE
-            AAdd( ::aRows, ::aEditRow )
-         ENDIF
+
+         AAdd( ::aRows, ::aEditRow )
+
          EXIT
       ENDSWITCH
-
+      
+      ::lEditRowChanged := .F.
       ::nState := FBDS_BROWSE
+      
    ENDIF
 
    RETURN lRes
@@ -2040,6 +2224,7 @@ METHOD Cancel() CLASS TFbDataSet
       IF ::nCurRow > ::RecordCount
          ::nCurRow := ::RecordCount
       ENDIF
+      ::lEditRowChanged := .F.
    ENDIF
 
    RETURN NIL
@@ -2054,9 +2239,8 @@ METHOD Delete() CLASS TFbDataSet
          lRes := ::UpdateParams( ::oDeleteSQL, ::aDeleteSQL[ 2 ] ) .AND. ::oDeleteSQL:Execute()
       ENDIF
 
-      ADel( ::aRows, ::nCurRow )
+      hb_ADel( ::aRows, ::nCurRow, .T. )
 
-      ::nDeletedRows := ::nDeletedRows + 1
       IF ::nCurRow > ::RecordCount
          ::nCurRow := ::RecordCount
       ENDIF
@@ -2140,18 +2324,57 @@ METHOD SetValue( ncIndex, xValue, lIsRefresh ) CLASS TFbDataSet
             IF HB_ISCHAR( ncIndex )
                ncIndex := ::oSelectSQL:FieldIndex( Upper( ncIndex ) )
             ENDIF
+            
             ::aRows[ ::nCurRec ][ ncIndex ] := xValue
          ENDIF
       ELSE
          IF HB_ISCHAR( ncIndex )
             ncIndex := ::oSelectSQL:FieldIndex( Upper( ncIndex ) )
          ENDIF
+         
          ::aEditRow[ ncIndex ] := xValue
+         ::lEditRowChanged := .T.
       ENDIF
 
    ENDIF
 
    RETURN NIL
+
+METHOD DefaulValue( ncIndex ) CLASS TFbDataSet
+
+   LOCAL xVal, aField
+   
+   IF HB_ISCHAR( ncIndex )
+      ncIndex := ::oSelectSQL:FieldIndex( Upper( ncIndex ) )
+   ENDIF
+
+   aField := ::FieldInfo( ncIndex )
+   
+   SWITCH aField[ 2 ]
+      
+   CASE SQL_TEXT
+   CASE SQL_VARYING
+      xVal := Space( aField[ 3 ] )
+      EXIT
+      
+   CASE SQL_SHORT
+   CASE SQL_LONG
+   CASE SQL_FLOAT
+   CASE SQL_DOUBLE
+   CASE SQL_D_FLOAT
+   CASE SQL_INT64
+      xVal := Val( Str( 0, aField[ 3 ], aField[ 4 ] ) )
+      EXIT
+      
+   CASE SQL_TIMESTAMP
+   CASE SQL_TYPE_TIME
+   CASE SQL_TYPE_DATE
+      xVal := hb_SToD()
+      EXIT
+      
+   ENDSWITCH
+
+   RETURN xVal
 
 METHOD SetDatabase( oValue ) CLASS TFbDataSet
 
@@ -2203,8 +2426,6 @@ METHOD SetActive( lValue ) CLASS TFbDataSet
          ::lSQLEof := .T.
          ::nCurRow := 0
          ::nState := FBDS_INACTIVE
-         ::nDeletedRows := 0
-         
       CASE lValue .AND. ! ::Active
          IF ::InitSQL()
             ::oSelectSQL:Execute()
