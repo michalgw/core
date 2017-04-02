@@ -30,8 +30,6 @@ FUNCTION Main()
    hb_langselect('PL')
    hb_cdpselect("UTF8")
    
-   AltD()
-  
    hb_FNameSplit( hb_argv( 0 ), NIL, @cName, NIL )
    cDatabase := hb_DirTemp() + cName + ".fdb"
 
@@ -111,8 +109,13 @@ FUNCTION Main()
    oDS:Open()
    ? "Execute inserts"
    FOR nI := 1 TO 10
+      ? "RecordCount before: ", oDS:RecordCount
+      ? "RecNo before: ", oDS:RecNo()
+
       ? "Setting params...", nI
       oDS:Append()
+      ? "RecordCount append: ", oDS:RecordCount
+      ? "RecNo append: ", oDS:RecNo()
       oDS:SetValue( 1, nI )
       oDS:SetValue( 2, - 2 * nI )
 
@@ -135,6 +138,9 @@ FUNCTION Main()
          ? "Error insert"
          QUIT
       ENDIF
+      ? "RecordCount after: ", oDS:RecordCount
+      ? "RecNo after: ", oDS:RecNo()
+
    NEXT
 
    oDS:Close()
@@ -147,6 +153,7 @@ FUNCTION Main()
    oDS:SelectSQL := "select * from test"
    oDS:DeleteSQL := { "delete from test where code = ?", "CODE" }
    oDS:UpdateSQL := { "update test set dept = ?, Name = ?, Sales = ?, Tax = ?, Salary = ?, Budget = ?, Discount = ?, Creation = ? where code = ?", { "dept", "Name", "Sales", "Tax", "Salary", "Budget", "Discount", "Creation", "code" } }
+   oDS:RefreshSQL := { "select * from test where code = ?", "CODE" }
    ? "Prepare..."
    oDS:Open()
    ? "Field count: ", oDS:FieldCount()
@@ -170,7 +177,17 @@ FUNCTION Main()
    ENDDO
    oDS:GoTop()
 
-   FBBrowse( oDS )
+   ? "Locate: ", oDS:Locate( { "CODE" }, { 5 } )
+      ? "Record no: ", oDS:RecNo()
+      FOR nI := 1 TO oDS:FieldCount()
+         ? "-----------------------------------------------------------"
+         ? oDS:FieldInfo( nI )[ 1 ], ":", oDS:GetValue( nI )
+      NEXT
+      
+      ? oDS[ 'code' ]
+      ? oDS[ 2 ]
+
+//   FBBrowse( oDS )
       
    oDS:Close()
    oTransaction:Commit()

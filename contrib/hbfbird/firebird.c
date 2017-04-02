@@ -1280,7 +1280,7 @@ HB_FUNC( FBSQLSETPARAM )
                var->sqltype = SQL_LONG | ( var->sqltype & 1 );
                var->sqllen = sizeof( long );
                var->sqlscale = 0;
-               hb_xrealloc( var->sqldata, sizeof( long ) );
+               var->sqldata = ( char * ) hb_xrealloc( var->sqldata, sizeof( long ) );
                long vall = hb_itemGetNL( xValue );
                hb_xmemcpy( var->sqldata, &vall, sizeof( long ));
                break;
@@ -1288,7 +1288,7 @@ HB_FUNC( FBSQLSETPARAM )
                var->sqltype = SQL_INT64 | ( var->sqltype & 1 );
                var->sqllen = sizeof( HB_MAXINT );
                var->sqlscale = 0;
-               hb_xrealloc( var->sqldata, sizeof( HB_MAXINT ) );
+               var->sqldata = ( char * ) hb_xrealloc( var->sqldata, sizeof( HB_MAXINT ) );
                HB_MAXINT valmi = hb_itemGetNInt( xValue );
                hb_xmemcpy( var->sqldata, &valmi, sizeof( HB_MAXINT ));
                break;
@@ -1296,7 +1296,7 @@ HB_FUNC( FBSQLSETPARAM )
                var->sqltype = SQL_DOUBLE | ( var->sqltype & 1 );
                var->sqllen = sizeof( double );
                var->sqlscale = 0;
-               hb_xrealloc( var->sqldata, sizeof( double ) );
+               var->sqldata = ( char * ) hb_xrealloc( var->sqldata, sizeof( double ) );
                double vald = hb_itemGetND( xValue );
                hb_xmemcpy( var->sqldata, &vald, sizeof( double ));
                break;
@@ -1323,14 +1323,14 @@ HB_FUNC( FBSQLSETPARAM )
                {
                   var->sqltype = SQL_TIMESTAMP | ( var->sqltype & 1 );
                   var->sqllen = sizeof( ISC_TIMESTAMP );
-                  hb_xrealloc( var->sqldata, sizeof( ISC_TIMESTAMP ) );
+                  var->sqldata = ( char * ) hb_xrealloc( var->sqldata, sizeof( ISC_TIMESTAMP ) );
                   isc_encode_timestamp( &timest, (ISC_TIMESTAMP*)var->sqldata );
                }
                else
                {
                   var->sqltype = SQL_TYPE_DATE | ( var->sqltype & 1 );
                   var->sqllen = sizeof( ISC_DATE );
-                  hb_xrealloc( var->sqldata, sizeof( ISC_DATE ) );
+                  var->sqldata = ( char * ) hb_xrealloc( var->sqldata, sizeof( ISC_DATE ) );
                   isc_encode_sql_date( &timest, (ISC_DATE*)var->sqldata );
                }
                break;
@@ -1338,7 +1338,7 @@ HB_FUNC( FBSQLSETPARAM )
                /* TODO: Support for new boolean fields in FB 3 */
                var->sqltype = SQL_SHORT | ( var->sqltype & 1 );
                var->sqllen = sizeof( short );
-               hb_xrealloc( var->sqldata, sizeof( short ) );
+               var->sqldata = ( char * ) hb_xrealloc( var->sqldata, sizeof( short ) );
                short vals;
                if ( hb_itemGetL( xValue ) )
                   vals = ( short ) ISC_TRUE;
@@ -1349,7 +1349,7 @@ HB_FUNC( FBSQLSETPARAM )
             case HB_IT_STRING:
                var->sqltype = SQL_TEXT | ( var->sqltype & 1 );
                var->sqllen = hb_itemGetCLen( xValue );
-               hb_xrealloc( var->sqldata, hb_itemGetCLen( xValue ) + 1 );
+               var->sqldata = ( char * ) hb_xrealloc( var->sqldata, hb_itemGetCLen( xValue ) + 1 );
                hb_xmemcpy( var->sqldata, hb_itemGetCPtr( xValue ), hb_itemGetCLen( xValue ) );
                break;
             case HB_IT_POINTER:
@@ -1357,7 +1357,7 @@ HB_FUNC( FBSQLSETPARAM )
                var->sqltype = SQL_BLOB | ( var->sqltype & 1 );
                var->sqllen = sizeof( ISC_QUAD );
                blob_id = (ISC_QUAD * ) hb_itemGetPtr( xValue );
-               hb_xrealloc( var->sqldata, sizeof( ISC_QUAD ) );
+               var->sqldata = ( char * ) hb_xrealloc( var->sqldata, sizeof( ISC_QUAD ) );
                hb_xmemcpy( var->sqldata, blob_id, sizeof( ISC_QUAD ) );
                break;
             default:
