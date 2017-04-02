@@ -25,10 +25,6 @@ FUNCTION Main()
    LOCAL nJ
    LOCAL cStr
    
-   //ErrorBlock( {| oError | FbDefError( oError ) } )
-   
-   //AltD()
-
    hb_langselect('PL')
    hb_cdpselect("UTF8")
    
@@ -195,20 +191,3 @@ FUNCTION Main()
    ? "END!"
 
    RETURN 0
-
-/*----------------------------------------------------------------------*/
-/*
-STATIC FUNCTION FbDefError( )
-   LOCAL n := 1
-   DO WHILE ! Empty( ProcName( ++n ) )
-
-      OutErr( hb_eol() )
-      OutErr( hb_StrFormat( "Called from %1$s(%2$d)  ", ;
-              ProcName( n ), ;
-              ProcLine( n ) ) )
-
-   ENDDO
-   ErrorLevel( 1 )
-   QUIT
-   RETURN .F.
-*/

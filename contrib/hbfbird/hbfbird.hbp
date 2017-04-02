@@ -24,3 +24,4 @@ ${hb_name}.hbx
 
 firebird.c
 tfirebrd.prg
+fbutils.prg

@@ -146,3 +146,12 @@
 #define FBTA_COMMITRETAINING              3
 #define FBTA_ROLLBACK                     4
 #define FBTA_ROLLBACKRETAINING            5
+
+/* field structure */
+#define FBFS_NAME                         1
+#define FBFS_TYPE                         2
+#define FBFS_LENGTH                       3
+#define FBFS_SCALE                        4
+#define FBFS_RELNAME                      5
+#define FBFS_ALIASNAME_LEN                6
+#define FBFS_ALIASNAME                    7

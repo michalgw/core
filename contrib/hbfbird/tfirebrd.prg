@@ -1336,6 +1336,17 @@ STATIC FUNCTION RemoveSpaces( cQuery )
 
    RETURN cQuery
 
+/* query array items - for internal use only */
+#define FBQA_STATEMENT      1
+#define FBQA_SQLDA          2
+#define FBQA_TRANSACTION    3
+#define FBQA_COLUMNS_COUNT  4
+#define FBQA_DIALECT        5
+#define FBQA_COLUMNS        6
+#define FBQA_STATEMENT_TYPE 7
+#define FBQA_PARAMS_SQLDA   8
+#define FBQA_PARAMS         9
+
 CREATE CLASS TFbSQL
 
    HIDDEN:
@@ -1372,7 +1383,7 @@ CREATE CLASS TFbSQL
    ACCESS Active      INLINE ( ::lActive )
    ASSIGN Active      METHOD SetActive( lValue )
    ACCESS Prepared    INLINE ( ! Empty( ::aQuery ) )
-   ACCESS StatementType INLINE ( iif( HB_ISARRAY( ::aQuery ), ::aQuery[ 7 ], 0 ) )
+   ACCESS StatementType INLINE ( iif( HB_ISARRAY( ::aQuery ), ::aQuery[ FBQA_STATEMENT_TYPE ], 0 ) )
    
    ACCESS SQL         INLINE ( ::cSQL )
    ASSIGN SQL         METHOD SetSQL( cValue )
@@ -1393,7 +1404,8 @@ METHOD New( oDatabase, oTransaction, cSQL ) CLASS TFbSQL
    ::oDatabase := oDatabase
    ::oTransaction := oTransaction
    ::cSQL := cSQL
-   ::cCursorName := 'HBSQL' + NetName() + AllTrim( Str( Random() ) ) + AllTrim( Str( Random() ) )
+   ::cCursorName := 'HBSQL' + NetName() + AllTrim( Str( hb_RandomInt( 0xFFFFFFFF ) ) ) ;
+      + AllTrim( Str( hb_RandomInt( 0xFFFFFFFF ) ) )
 
    RETURN Self
 
@@ -1432,7 +1444,8 @@ METHOD Execute() CLASS TFbSQL
       ::Prepare()
    ENDIF
    
-   IF ( ( ::aQuery[ 7 ] == ISC_INFO_SQL_STMT_SELECT ) .OR. ( ::aQuery[ 7 ] == ISC_INFO_SQL_STMT_SELECT_FOR_UPD ) ) ;
+   IF ( ( ::aQuery[ FBQA_STATEMENT_TYPE ] == ISC_INFO_SQL_STMT_SELECT ) ;
+      .OR. ( ::aQuery[ FBQA_STATEMENT_TYPE ] == ISC_INFO_SQL_STMT_SELECT_FOR_UPD ) ) ;
       .AND. HB_ISCHAR( ::cCursorName ) .AND. Len( ::cCursorName ) > 0
       
       cCurName := ::cCursorName
@@ -1446,7 +1459,9 @@ METHOD Execute() CLASS TFbSQL
    IF nRes <> 0
       Eval( ErrorBlock(), FBErrorNew( nRes ) )
    ELSE
-      IF ( ::aQuery[ 7 ] == ISC_INFO_SQL_STMT_SELECT ) .OR. ( ::aQuery[ 7 ] == ISC_INFO_SQL_STMT_SELECT_FOR_UPD )
+      IF ( ::aQuery[ FBQA_STATEMENT_TYPE ] == ISC_INFO_SQL_STMT_SELECT ) ;
+         .OR. ( ::aQuery[ FBQA_STATEMENT_TYPE ] == ISC_INFO_SQL_STMT_SELECT_FOR_UPD )
+         
          ::lActive := .T.
       ENDIF
    ENDIF
@@ -1486,8 +1501,8 @@ METHOD ParamCount() CLASS TFbSQL
 
    LOCAL nRes := 0
 
-   IF HB_ISARRAY( ::aQuery ) .AND. HB_ISARRAY( ::aQuery[ 9 ] )
-      nRes := Len( ::aQuery[ 9 ] )
+   IF HB_ISARRAY( ::aQuery ) .AND. HB_ISARRAY( ::aQuery[ FBQA_PARAMS ] )
+      nRes := Len( ::aQuery[ FBQA_PARAMS ] )
    ENDIF
 
    RETURN nRes
@@ -1496,8 +1511,8 @@ METHOD ParamInfo( nIndex ) CLASS TFbSQL
 
    LOCAL aRes := {}
 
-   IF HB_ISARRAY( ::aQuery ) .AND. HB_ISARRAY( ::aQuery[ 9 ] )
-      aRes := Len( ::aQuery[ 9 ][ nIndex ] )
+   IF HB_ISARRAY( ::aQuery ) .AND. HB_ISARRAY( ::aQuery[ FBQA_PARAMS ] )
+      aRes := Len( ::aQuery[ FBQA_PARAMS ][ nIndex ] )
    ENDIF
 
    RETURN aRes
@@ -1529,8 +1544,8 @@ METHOD FieldCount() CLASS TFbSQL
 
    LOCAL nRes := 0
 
-   IF HB_ISARRAY( ::aQuery ) .AND. HB_ISARRAY( ::aQuery[ 6 ] )
-      nRes := Len( ::aQuery[ 6 ] )
+   IF HB_ISARRAY( ::aQuery ) .AND. HB_ISARRAY( ::aQuery[ FBQA_COLUMNS ] )
+      nRes := Len( ::aQuery[ FBQA_COLUMNS ] )
    ENDIF
 
    RETURN nRes
@@ -1539,8 +1554,8 @@ METHOD FieldInfo( nIndex ) CLASS TFbSQL
 
    LOCAL aRes := {}
 
-   IF HB_ISARRAY( ::aQuery ) .AND. HB_ISARRAY( ::aQuery[ 6 ] )
-      aRes := ::aQuery[ 6 ][ nIndex ]
+   IF HB_ISARRAY( ::aQuery ) .AND. HB_ISARRAY( ::aQuery[ FBQA_COLUMNS ] )
+      aRes := ::aQuery[ FBQA_COLUMNS ][ nIndex ]
    ENDIF
 
    RETURN aRes
@@ -1551,7 +1566,7 @@ METHOD FieldIndex( cFieldName ) CLASS TFbSQL
    LOCAL nI
 
    FOR nI := 1 TO ::FieldCount()      
-      IF Upper( ::aQuery[ 6 ][ nI ][ 1 ] ) == Upper( cFieldName )
+      IF Upper( ::aQuery[ FBQA_COLUMNS ][ nI ][ FBFS_NAME ] ) == Upper( cFieldName )
          nRes := nI
          EXIT
       ENDIF
@@ -1584,7 +1599,7 @@ METHOD GetRow( lAsHash ) CLASS TFbSQL
    IF lAsHash
       aRow := hb_Hash()
       FOR n := 1 TO ::FieldCount()
-         aRow[ ::FieldInfo( n )[ 1 ] ] := ::GetValue( n )
+         aRow[ ::FieldInfo( n )[ FBFS_NAME ] ] := ::GetValue( n )
       NEXT
    ELSE
       aRow := Array( ::FieldCount() )
@@ -1651,6 +1666,14 @@ METHOD SetCursorName( cValue ) CLASS TFbSQL
 
    RETURN NIL
 
+/* blob array items - for internal use only */
+#define FBBA_QUAD           1
+#define FBBA_HANDLE         2
+#define FBBA_NUM_SEG        3
+#define FBBA_MAX_SEG        4
+#define FBBA_TOTAL_LEN      5
+#define FBBA_BLOB_TYPE      6
+
 CREATE CLASS TFbBlobReader
 
    HIDDEN:
@@ -1667,10 +1690,10 @@ CREATE CLASS TFbBlobReader
    METHOD Close()
    
    ACCESS Active      INLINE ( ::lActive )
-   ACCESS NumSegments INLINE ( ::aBlob[ 3 ] )
-   ACCESS MaxSegment  INLINE ( ::aBlob[ 4 ] )
-   ACCESS TotalLength INLINE ( ::aBlob[ 5 ] )
-   ACCESS BlobType    INLINE ( ::aBlob[ 6 ] )
+   ACCESS NumSegments INLINE ( ::aBlob[ FBBA_NUM_SEG ] )
+   ACCESS MaxSegment  INLINE ( ::aBlob[ FBBA_MAX_SEG ] )
+   ACCESS TotalLength INLINE ( ::aBlob[ FBBA_TOTAL_LEN ] )
+   ACCESS BlobType    INLINE ( ::aBlob[ FBBA_BLOB_TYPE ] )
 
 ENDCLASS
 
@@ -1737,7 +1760,7 @@ CREATE CLASS TFbBlobWriter
    
    ACCESS Active      INLINE ( ::lActive )
    ACCESS WriteSize   INLINE ( ::nWriten )
-   ACCESS Quad        INLINE ( ::aBlob[ 1 ] )
+   ACCESS Quad        INLINE ( ::aBlob[ FBBA_QUAD ] )
 
 ENDCLASS
 
@@ -1855,6 +1878,8 @@ CREATE CLASS TFbDataSet
    METHOD GetValue( ncIndex )
    METHOD SetValue( ncIndex, xValue, lIsRefresh )
    METHOD DefaulValue( ncIndex )
+   
+   METHOD Locate( aFlds, aValues, lContinue, lCaseSensitive, lPartial )
 
    ACCESS Database INLINE ( ::oDatabase )
    ASSIGN Database METHOD SetDatabase( oValue )
@@ -1876,6 +1901,12 @@ CREATE CLASS TFbDataSet
    ASSIGN DeleteSQL METHOD SetDeleteSQL( aValue )
    ACCESS RefreshSQL INLINE ( ::aRefreshSQL )
    ASSIGN RefreshSQL METHOD SetRefreshSQL( aValue )
+   
+   ACCESS SelectObj INLINE ( ::oSelectSQL )
+   ACCESS InsertObj INLINE ( ::oInsertSQL )
+   ACCESS UpdateObj INLINE ( ::oUpdateSQL )
+   ACCESS DeleteObj INLINE ( ::oDeleteSQL )
+   ACCESS RefreshObj INLINE ( ::oRefreshSQL )
    
    ACCESS RecordCount INLINE ( ( Len( ::aRows ) + iif( ::nState == FBDS_APPEND, 1, 0 ) ) )
    
@@ -1901,7 +1932,8 @@ METHOD InitSQL() CLASS TFbDataSet
    
    IF HB_ISARRAY( ::aInsertSQL ) .AND. HB_ISCHAR( ::aInsertSQL[ 1 ] ) .AND. Len( ::aInsertSQL[ 1 ] ) > 0
       ::oInsertSQL:SQL := ::aInsertSQL[ 1 ]
-      ::lCanInsert := ::oInsertSQL:Prepare() .AND. ::oInsertSQL:StatementType == ISC_INFO_SQL_STMT_INSERT
+      ::lCanInsert := ::oInsertSQL:Prepare() .AND. ;
+         ( ::oInsertSQL:StatementType == ISC_INFO_SQL_STMT_INSERT .OR. ::oInsertSQL:StatementType == ISC_INFO_SQL_STMT_EXEC_PROCEDURE )
    ELSE
       ::lCanInsert := .F.
    ENDIF
@@ -2189,6 +2221,7 @@ METHOD Append() CLASS TFbDataSet
 METHOD Post() CLASS TFbDataSet
 
    LOCAL lRes := .F.
+   LOCAL n
    
    IF ::Active .AND. ( ::State == FBDS_EDIT .OR. ::State == FBDS_APPEND ) .AND. ::lEditRowChanged
 
@@ -2202,6 +2235,14 @@ METHOD Post() CLASS TFbDataSet
       CASE FBDS_APPEND
          IF ::lCanInsert
             lRes := ::UpdateParams( ::oInsertSQL, ::aInsertSQL[ 2 ] ) .AND. ::oInsertSQL:Execute()
+            
+            // RETURNING values
+            IF lRes .AND. ( ::oInsertSQL:FieldCount() > 0 )
+               FOR n := 1 TO ::oInsertSQL:FieldCount()
+                  ::SetValue( ::oInsertSQL:FieldInfo( n )[ FBFS_NAME ], ::oInsertSQL:GetValue( n ) )
+               NEXT
+            ENDIF
+
          ENDIF
 
          AAdd( ::aRows, ::aEditRow )
@@ -2376,6 +2417,72 @@ METHOD DefaulValue( ncIndex ) CLASS TFbDataSet
 
    RETURN xVal
 
+METHOD Locate( aFlds, aValues, lContinue, lCaseSensitive, lPartial ) CLASS TFbDataSet
+
+   LOCAL lRes := .F.
+   LOCAL n
+   LOCAL xDbVal, xFindVal
+   
+   hb_default( @lContinue, .F. )
+   hb_default( @lCaseSensitive, .T. )
+   hb_default( @lPartial, .F. )
+
+   IF ::Active .AND. ( ::RecordCount > 0 )
+      IF ( Len( aFlds ) > 0 ) .AND. ( Len( aFlds ) == Len( aFlds ) )
+         
+         IF ! lContinue
+            ::GoTop()
+         ENDIF
+         
+         DO WHILE .NOT. ::Eof()
+            
+            FOR n := 1 TO Len( aFlds )
+               
+               xDbVal := ::GetValue( aFlds[ n ] )
+               xFindVal := aValues[ n ]
+               
+               IF ValType( xDbVal ) == ValType( xFindVal )
+                  
+                  IF ValType( xFindVal ) == "C"
+
+                     IF ! lCaseSensitive
+                        xDbVal := Upper( xDbVal )
+                        xFindVal := Upper( xFindVal )
+                     ENDIF
+
+                     IF lPartial
+                        lRes := At( xFindVal, xDbVal ) > 0
+                     ELSE
+                        lRes := At( xFindVal, xDbVal ) == 1
+                     ENDIF
+
+                  ELSE
+
+                     lRes := xDbVal == xFindVal
+
+                  ENDIF
+                  
+               ENDIF
+               
+               IF ! lRes
+                  EXIT // forloop
+               ENDIF
+               
+            NEXT
+            
+            IF lRes
+               EXIT // dowhile
+            ENDIF
+            
+            ::Skip( 1 )
+
+         ENDDO
+         
+      ENDIF
+   ENDIF
+
+   RETURN lRes
+   
 METHOD SetDatabase( oValue ) CLASS TFbDataSet
 
    IF ! ::Active

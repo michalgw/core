@@ -1033,18 +1033,18 @@ HB_FUNC( FBSQLCREATE )
                switch( dtype )
                {
                   case SQL_VARYING:
-                     var->sqltype = SQL_TEXT;
-                     var->sqldata = ( char * ) hb_xgrab( sizeof( char ) * var->sqllen + 2 );
-                     break;
                   case SQL_TEXT:
                      var->sqldata = ( char * ) hb_xgrab( sizeof( char ) * var->sqllen + 2 );
                      break;
-                  case SQL_LONG:
-                     var->sqltype = SQL_LONG;
-                     var->sqldata = ( char * ) hb_xgrab( sizeof( long ) );
-                     break;
                   default:
-                     var->sqldata = ( char * ) hb_xgrab( sizeof( char ) * var->sqllen );
+                     if ( var->sqllen > 0 )
+                     {
+                        var->sqldata = ( char * ) hb_xgrab( sizeof( char ) * var->sqllen );
+                     }
+                     else
+                     {
+                        var->sqldata = ( char * ) hb_xgrab( sizeof( char ) * 1 );
+                     }                     
                      break;
                }
 
@@ -1111,18 +1111,18 @@ HB_FUNC( FBSQLCREATE )
                      switch( dtype )
                      {
                         case SQL_VARYING:
-                           var->sqltype = SQL_TEXT;
-                           var->sqldata = ( char * ) hb_xgrab( sizeof( char ) * var->sqllen + 2 );
-                           break;
                         case SQL_TEXT:
                            var->sqldata = ( char * ) hb_xgrab( sizeof( char ) * var->sqllen + 2 );
                            break;
-                        case SQL_LONG:
-                           var->sqltype = SQL_LONG;
-                           var->sqldata = ( char * ) hb_xgrab( sizeof( long ) );
-                           break;
                         default:
-                           var->sqldata = ( char * ) hb_xgrab( sizeof( char ) * var->sqllen );
+                           if ( var->sqllen > 0 )
+                           {
+                              var->sqldata = ( char * ) hb_xgrab( sizeof( char ) * var->sqllen );
+                           }
+                           else
+                           {
+                              var->sqldata = ( char * ) hb_xgrab( sizeof( char ) * 1 );
+                           }                     
                            break;
                      }
 
@@ -1282,7 +1282,7 @@ HB_FUNC( FBSQLSETPARAM )
                var->sqlscale = 0;
                hb_xrealloc( var->sqldata, sizeof( long ) );
                long vall = hb_itemGetNL( xValue );
-               memcpy( var->sqldata, &vall, sizeof( long ));
+               hb_xmemcpy( var->sqldata, &vall, sizeof( long ));
                break;
             case HB_IT_LONG:
                var->sqltype = SQL_INT64 | ( var->sqltype & 1 );
@@ -1290,7 +1290,7 @@ HB_FUNC( FBSQLSETPARAM )
                var->sqlscale = 0;
                hb_xrealloc( var->sqldata, sizeof( HB_MAXINT ) );
                HB_MAXINT valmi = hb_itemGetNInt( xValue );
-               memcpy( var->sqldata, &valmi, sizeof( HB_MAXINT ));
+               hb_xmemcpy( var->sqldata, &valmi, sizeof( HB_MAXINT ));
                break;
             case HB_IT_DOUBLE:
                var->sqltype = SQL_DOUBLE | ( var->sqltype & 1 );
@@ -1298,7 +1298,7 @@ HB_FUNC( FBSQLSETPARAM )
                var->sqlscale = 0;
                hb_xrealloc( var->sqldata, sizeof( double ) );
                double vald = hb_itemGetND( xValue );
-               memcpy( var->sqldata, &vald, sizeof( double ));
+               hb_xmemcpy( var->sqldata, &vald, sizeof( double ));
                break;
             case HB_IT_DATE:
             case HB_IT_TIMESTAMP:
@@ -1344,13 +1344,13 @@ HB_FUNC( FBSQLSETPARAM )
                   vals = ( short ) ISC_TRUE;
                else
                   vals = ( short ) ISC_FALSE;
-               memcpy( var->sqldata, &vals, sizeof( short ));               
+               hb_xmemcpy( var->sqldata, &vals, sizeof( short ));               
                break;
             case HB_IT_STRING:
                var->sqltype = SQL_TEXT | ( var->sqltype & 1 );
                var->sqllen = hb_itemGetCLen( xValue );
-               hb_xrealloc( var->sqldata, hb_itemGetCLen( xValue ) );
-               memcpy(var->sqldata, hb_itemGetCPtr( xValue ), hb_itemGetCLen( xValue ) );
+               hb_xrealloc( var->sqldata, hb_itemGetCLen( xValue ) + 1 );
+               hb_xmemcpy( var->sqldata, hb_itemGetCPtr( xValue ), hb_itemGetCLen( xValue ) );
                break;
             case HB_IT_POINTER:
                // ISC_QUAD - BLOB
@@ -1358,7 +1358,7 @@ HB_FUNC( FBSQLSETPARAM )
                var->sqllen = sizeof( ISC_QUAD );
                blob_id = (ISC_QUAD * ) hb_itemGetPtr( xValue );
                hb_xrealloc( var->sqldata, sizeof( ISC_QUAD ) );
-               memcpy( var->sqldata, blob_id, sizeof( ISC_QUAD ) );
+               hb_xmemcpy( var->sqldata, blob_id, sizeof( ISC_QUAD ) );
                break;
             default:
                hb_retnl(-1);
@@ -1400,14 +1400,18 @@ HB_FUNC( FBSQLGETDATA )
       else
       {
          struct tm times;
-
+         int str_len;
          short dtype = var->sqltype & ~1;
 
          switch( dtype )
          {
             case SQL_TEXT:
-            case SQL_VARYING:
                hb_retclen( var->sqldata, var->sqllen );
+               break;
+            
+            case SQL_VARYING:
+               str_len = isc_vax_integer( var->sqldata, 2 );
+               hb_retclen( ( char * ) var->sqldata + 2, str_len );
                break;
 
             case SQL_TIMESTAMP:
@@ -1441,7 +1445,7 @@ HB_FUNC( FBSQLGETDATA )
             case SQL_BLOB:
             case SQL_QUAD:
                blob_id = hb_gcAllocate( sizeof( ISC_QUAD ), &s_gcQuad );
-               memcpy( blob_id, var->sqldata, sizeof( ISC_QUAD ) );
+               hb_xmemcpy( blob_id, var->sqldata, sizeof( ISC_QUAD ) );
                hb_retptrGC( blob_id );
                break;
 
