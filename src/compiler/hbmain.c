@@ -895,13 +895,24 @@ const char * hb_compStaticVariableName( HB_COMP_DECL, HB_USHORT wVar )
    return pVar ? pVar->szName : NULL;
 }
 
-int hb_compVariableScope( HB_COMP_DECL, const char * szVarName )
+static int hb_compVariableScope( HB_COMP_DECL, const char * szVarName )
 {
    int iScope;
 
    hb_compVariableFind( HB_COMP_PARAM, szVarName, NULL, &iScope );
 
    return iScope;
+}
+
+void hb_compPushMacroVar( HB_COMP_DECL, const char * szVarName )
+{
+   /* save and restore iEarlyEvalPass to not disable early
+      evaluation when only macrovar and/or macrotex is used */
+   int iEarlyEvalPass = HB_COMP_PARAM->functions.pLast->iEarlyEvalPass;
+
+   hb_compGenPushVar( szVarName, HB_COMP_PARAM );
+
+   HB_COMP_PARAM->functions.pLast->iEarlyEvalPass = iEarlyEvalPass;
 }
 
 void hb_compPushMacroText( HB_COMP_DECL, const char * szText, HB_SIZE nLen, HB_BOOL fMacro )
@@ -2626,6 +2637,14 @@ void hb_compGenMessage( const char * szMsgName, HB_BOOL bIsObject, HB_COMP_DECL 
       wSym = 0xFFFF;
       hb_compGenPCode3( HB_P_WITHOBJECTMESSAGE, HB_LOBYTE( wSym ), HB_HIBYTE( wSym ), HB_COMP_PARAM );
    }
+
+   if( ! bIsObject && HB_COMP_PARAM->functions.pLast->iEarlyEvalPass == 1 )
+   {
+      if( HB_SUPPORT_MACRODECL )
+         HB_COMP_PARAM->functions.pLast->iEarlyEvalPass = 0;
+      else
+         hb_compErrorCodeblockWith( HB_COMP_PARAM, szMsgName ? szMsgName : "&..." );
+   }
 }
 
 void hb_compGenMessageData( const char * szMsg, HB_BOOL bIsObject, HB_COMP_DECL ) /* generates an underscore-symbol name for a data assignment */
@@ -2659,7 +2678,7 @@ static void hb_compCheckEarlyMacroEval( HB_COMP_DECL, const char * szVarName, in
           HB_SUPPORT_MACRODECL )
          HB_COMP_PARAM->functions.pLast->iEarlyEvalPass = 0;
       else
-         hb_compErrorCodeblock( HB_COMP_PARAM, szVarName );
+         hb_compErrorCodeblockDecl( HB_COMP_PARAM, szVarName );
    }
 }
 
@@ -4209,7 +4228,7 @@ static int hb_compCompile( HB_COMP_DECL, const char * szPrg, const char * szBuff
 
       if( szBuffer )
       {
-         if( ! hb_pp_inBuffer( HB_COMP_PARAM->pLex->pPP, szBuffer, strlen( szBuffer ), iStartLine ) )
+         if( ! hb_pp_inBuffer( HB_COMP_PARAM->pLex->pPP, szFileName, szBuffer, strlen( szBuffer ), iStartLine ) )
          {
             hb_compOutErr( HB_COMP_PARAM, "Cannot create preprocessor buffer." );
             iStatus = EXIT_FAILURE;

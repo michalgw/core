@@ -2857,6 +2857,7 @@ static HB_ERRCODE hb_dbfPutValue( DBFAREAP pArea, HB_USHORT uiIndex, PHB_ITEM pI
       hb_errPutOperation( pError, hb_dynsymName( ( PHB_DYNS ) pField->sym ) );
       hb_errPutSubCode( pError, errCode );
       hb_errPutFlags( pError, EF_CANDEFAULT );
+      hb_errPutArgs( pError, 1, pItem );
       errCode = SELF_ERROR( &pArea->area, pError );
       hb_itemRelease( pError );
       return errCode == E_DEFAULT ? HB_SUCCESS : HB_FAILURE;
@@ -6430,7 +6431,7 @@ static HB_ERRCODE hb_dbfExists( LPRDDNODE pRDD, PHB_ITEM pItemTable, PHB_ITEM pI
    if( pFileExt )
       hb_itemRelease( pFileExt );
 
-   return hb_fileExists( szFileName, NULL ) ? HB_SUCCESS : HB_FAILURE;
+   return hb_fileExists( szFileName, szFileName ) ? HB_SUCCESS : HB_FAILURE;
 }
 
 static HB_ERRCODE hb_dbfRename( LPRDDNODE pRDD, PHB_ITEM pItemTable, PHB_ITEM pItemIndex, PHB_ITEM pItemNew, HB_ULONG ulConnect )
