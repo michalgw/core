@@ -81,6 +81,8 @@ CREATE CLASS TFbServer
    METHOD   NetErr()   INLINE ::lError
    METHOD   Error()    INLINE FBError( ::nError )
    METHOD   ErrorNo()  INLINE ::nError
+   
+   METHOD   GetInfo( aInfos )
 
 ENDCLASS
 
@@ -452,6 +454,19 @@ METHOD Update( oRow, cWhere, oTransaction ) CLASS TFbServer
    ENDIF
 
    RETURN result
+
+METHOD GetInfo( aInfos ) CLASS TFbServer
+
+   LOCAL aRes
+
+   aRes := FBDBGetInfo( ::db, aInfos )
+
+   IF ! HB_ISARRAY( aRes )
+      ::lError := .T.
+      ::nError := aRes
+   ENDIF
+   
+   RETURN aRes
 
 CREATE CLASS TFbTransaction
    

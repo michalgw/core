@@ -1732,3 +1732,156 @@ HB_FUNC( FBBLOBCLOSE )
    else
       hb_errRT_BASE( EG_ARG, 2020, NULL, HB_ERR_FUNCNAME, HB_ERR_ARGS_BASEPARAMS );
 }
+
+HB_FUNC( FBDBGETINFO )
+{
+   isc_db_handle db = hb_FB_db_handle_par( 1 );
+   PHB_ITEM aParams = hb_param( 2, HB_IT_ARRAY );
+
+   if( db && aParams )
+   {
+      char             inparams[ 64 ];
+      char             resbuf[ 1024 ];
+      PHB_ITEM         aRes = NULL, aItem;
+      unsigned int     i, len = 0;
+      ISC_STATUS_ARRAY status;
+      char *           p;
+      char             item;
+      
+      for ( i = 1; ( i <= hb_arrayLen( aParams ) ) && ( i < sizeof( inparams ) ) ; i++ )
+      {
+         inparams[ i - 1 ] = ( char ) hb_arrayGetNI( aParams, i );
+      }
+      
+      inparams[ i ] = isc_info_end;
+      len = i + 1;
+      
+      if ( isc_database_info( status, &db, len, inparams, sizeof( resbuf ), resbuf ) )
+      {
+         hb_retnl( isc_sqlcode( status ) );
+         return;
+      }
+      
+      aRes = hb_itemArrayNew( 0 );
+      
+      for ( p = resbuf; *p != isc_info_end ; )
+      {
+         item = *p++;
+         len = isc_vax_integer( p, 2 );
+         p += 2;
+         switch ( item )
+         {
+            case isc_info_db_id:
+               aItem = hb_itemArrayNew( 4 );
+               hb_arraySetNI( aItem, 1, item );
+               hb_arraySetNI( aItem, 2, p[ 0 ] );                             // 2 - local connection, 4 - remote
+               hb_arraySetCL( aItem, 3, &p[ 2 ], p[ 1 ] );                    // database file name
+               hb_arraySetCL( aItem, 4, &p[ p[ 1 ] + 3 ], p[ p[ 1 ] + 2 ] );  // site name
+               hb_arrayAdd( aRes, aItem );
+               break;
+               
+            case isc_info_reads:
+            case isc_info_writes:
+            case isc_info_fetches:
+            case isc_info_marks:
+            case isc_info_page_size:
+            case isc_info_num_buffers:
+            case isc_info_current_memory:
+            case isc_info_max_memory:
+            case isc_info_allocation:
+            case isc_info_attachment_id:
+            case isc_info_read_seq_count:
+            case isc_info_read_idx_count:
+            case isc_info_insert_count:
+            case isc_info_update_count:
+            case isc_info_delete_count:
+            case isc_info_backout_count:
+            case isc_info_purge_count:
+            case isc_info_expunge_count:
+            case isc_info_sweep_interval:
+            case isc_info_ods_version:
+            case isc_info_ods_minor_version:
+            case isc_info_page_errors:
+            case isc_info_record_errors:
+            case isc_info_bpage_errors:
+            case isc_info_dpage_errors:
+            case isc_info_ipage_errors:
+            case isc_info_ppage_errors:
+            case isc_info_tpage_errors:
+            case isc_info_set_page_buffers:
+            case isc_info_db_size_in_pages:
+            case frb_info_att_charset:
+            case isc_info_db_class:
+            case isc_info_oldest_transaction:
+            case isc_info_oldest_active:
+            case isc_info_oldest_snapshot:
+            case isc_info_next_transaction:
+            case isc_info_db_provider:
+            case isc_info_active_tran_count:
+            case isc_info_active_transactions:
+            case isc_info_db_file_size:
+               aItem = hb_itemArrayNew( 2 );
+               hb_arraySetNI( aItem, 1, item );
+               hb_arraySetNI( aItem, 2, isc_vax_integer( p, len ) );
+               hb_arrayAdd( aRes, aItem );
+               break;
+
+            case isc_info_implementation:
+               aItem = hb_itemArrayNew( 4 );
+               hb_arraySetNI( aItem, 1, item );
+               hb_arraySetNI( aItem, 2, p[0] );                               // = 1
+               hb_arraySetNI( aItem, 3, p[1] );                               // implementation number
+               hb_arraySetNI( aItem, 4, p[2] );                               // class number
+               break;
+
+            case isc_info_isc_version:
+               aItem = hb_itemArrayNew( 3 );
+               hb_arraySetNI( aItem, 1, item );
+               hb_arraySetNI( aItem, 2, p[ 0 ] );                             // = 1
+               hb_arraySetCL( aItem, 3, &p[ 2 ], p[ 1 ] );                    // version string
+               hb_arrayAdd( aRes, aItem );
+               break;
+
+            case isc_info_base_level:
+               aItem = hb_itemArrayNew( 3 );
+               hb_arraySetNI( aItem, 1, item );
+               hb_arraySetNI( aItem, 2, p[0] );                               // = 1
+               hb_arraySetNI( aItem, 3, p[1] );                               // version number
+               hb_arrayAdd( aRes, aItem );
+               break;
+               
+            case isc_info_no_reserve:
+            case isc_info_forced_writes:
+            case isc_info_db_sql_dialect:
+            case isc_info_db_read_only:
+               aItem = hb_itemArrayNew( 2 );
+               hb_arraySetNI( aItem, 1, item );
+               hb_arraySetNI( aItem, 2, p[0] );
+               hb_arrayAdd( aRes, aItem );
+               break;
+
+            case isc_info_user_names:
+            case isc_info_firebird_version:
+               aItem = hb_itemArrayNew( 2 );
+               hb_arraySetNI( aItem, 1, item );
+               hb_arraySetCL( aItem, 2, &p[ 1 ], p[ 0 ] );
+               hb_arrayAdd( aRes, aItem );               
+               break;
+               
+            case isc_info_creation_date:
+               /* TODO */
+               break;
+            
+            default:
+               break;
+            
+         }
+         p += len;
+      }
+
+      hb_itemReturnRelease( aRes );
+
+   }
+   else
+      hb_errRT_BASE( EG_ARG, 2020, NULL, HB_ERR_FUNCNAME, HB_ERR_ARGS_BASEPARAMS );
+}
