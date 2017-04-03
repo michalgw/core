@@ -120,6 +120,33 @@ static const HB_GC_FUNCS s_gcQuad =
    hb_gcDummyMark
 };
 
+int fb_pb_add_char( char * buffer, int buflen, short * pos, char val )
+{
+   if ( *pos < buflen - 1 )
+   {
+      buffer[ *pos ] = val;
+      *pos = *pos + 1;
+      return 1;
+   }
+   return 0;
+}
+
+int fb_pb_add_str( char * buffer, int buflen, short * pos, char * val, int vallen )
+{
+   if ( *pos < buflen - vallen - 1 )
+   {
+      buffer[ *pos ] = vallen;
+      *pos = *pos + 1;
+      for ( int i = 0; i < vallen; i++ )
+      {
+         buffer[ *pos ] = val[ i ];
+         *pos = *pos + 1;
+      }
+      return vallen;
+   }
+   return 0;
+}
+
 /* API wrappers */
 
 HB_FUNC( FBCREATEDB )
@@ -158,96 +185,114 @@ HB_FUNC( FBCONNECT )
    const char *     db_connect = hb_parcx( 1 );
    const char *     user       = hb_parcx( 2 );
    const char *     passwd     = hb_parcx( 3 );
-   char  dpb[ 256 ];
+   char  dpb[ 1024 ];
    short i = 0;
-   int   len;
+
    // dodatkowe parametry jako tablica np: { { isc_dpb_lc_ctype, "UTF8" }, { isc_dpb_user_name, "sysdba" }, { isc_dpb_password, "masterkey" }, isc_dpb_force_write }
    PHB_ITEM aParams            = hb_param( 4, HB_IT_ARRAY );
 
+   // inicjowanie struktury dpb
+   fb_pb_add_char( dpb, sizeof( dpb ), &i, isc_dpb_version1 );
+
    // Mamy dodatkowe parametry
-   if ( aParams ) {
-      // inicjowanie struktury dpb
-      dpb[ i++ ] = isc_dpb_version1;
+   if ( aParams ) 
+   {
 
       // liczba parametrow w tablicy
       int paramCount = hb_arrayLen( aParams );
 
       // pobieramy kolejne parametry z tablicy
-      for (int cnt = 1; cnt <= paramCount; cnt++) {
+      for (int cnt = 1; cnt <= paramCount; cnt++) 
+      {
 
          // pojedyncy parametr
          PHB_ITEM xParam = hb_itemArrayGet( aParams, cnt );
+         
          // jesli to numer to dodajemy to struktury dpb
          if ( HB_IS_NUMERIC( xParam ) ) {
-            dpb[ i++ ] = ( char ) hb_itemGetNI( xParam );
-
-         // jesli tablica 2-elementowa to pierwszy element jest typem parametru a drugi jest wartoscia
-         } else if ( HB_IS_ARRAY( xParam ) && hb_arrayLen( xParam ) == 2 ) {
-            // typ parametru dpb
-            PHB_ITEM nParamType = hb_itemArrayGet( xParam, 1 );
-            // akceptujemy tylko liczby
-            if ( HB_IS_NUMERIC( nParamType ) ) {
-               char nParamTypeN = ( char ) hb_itemGetNI( nParamType );
-               // drugi element tablicy to wartosc parametru
-               PHB_ITEM xParamVal = hb_itemArrayGet( xParam, 2 );
-               if ( HB_IS_STRING( xParamVal ) ) {
-                  if ( nParamTypeN == isc_dpb_user_name ) {
-                     // nadpisujemy nazwe uzytkownika
-                     user = hb_itemGetCPtr( xParamVal );
-                  } else if ( nParamTypeN == isc_dpb_password ) {
-                     // nadpisujemy haslo
-                     passwd = hb_itemGetCPtr( xParamVal );
-                  } else {
-                     // dodajemy parametr i jego wartosc do dpb
-                     const char * cParamStr = hb_itemGetCPtr( xParamVal );
-                     dpb[ i++ ] = ( char ) hb_itemGetNI( nParamType );
-                     len = ( int ) strlen( cParamStr );
-                     if( len > ( int ) ( sizeof( dpb ) - i - 4 ) )
-                        len = ( int ) ( sizeof( dpb ) - i - 4 );
-                     dpb[ i++ ] = ( char ) len;
-                     hb_strncpy( &( dpb[ i ] ), cParamStr, len );
-                     i += ( short ) len;
-                  }
-               } else if ( HB_IS_NUMERIC( xParamVal ) ) {
-                  // TODO: obsluga parametrow liczbowych
-               }
+            if ( ! fb_pb_add_char( dpb, sizeof( dpb ), &i, ( char ) hb_itemGetNI( xParam ) ) ||
+               ! fb_pb_add_char( dpb, sizeof( dpb ), &i, 1 ) ||
+               ! fb_pb_add_char( dpb, sizeof( dpb ), &i, 0 ) )
+            {
+               // koniec bufora
+               hb_retnl( 1 );
+               return;
             }
 
+         // jesli tablica 2-elementowa to pierwszy element jest typem parametru a drugi jest wartoscia
+         } 
+         else if ( HB_IS_ARRAY( xParam ) && hb_arrayLen( xParam ) == 2 ) 
+         {
+            // typ parametru dpb
+            PHB_ITEM nParamType = hb_itemArrayGet( xParam, 1 );
+            
+            // akceptujemy tylko liczby
+            if ( HB_IS_NUMERIC( nParamType ) ) 
+            {
+               char nParamTypeN = ( char ) hb_itemGetNI( nParamType );
+               
+               // drugi element tablicy to wartosc parametru
+               PHB_ITEM xParamVal = hb_itemArrayGet( xParam, 2 );
+               
+               if ( HB_IS_STRING( xParamVal ) ) 
+               {
+                  if ( nParamTypeN == isc_dpb_user_name ) 
+                  {
+                     // nadpisujemy nazwe uzytkownika
+                     user = hb_itemGetCPtr( xParamVal );
+                  }
+                  else if ( nParamTypeN == isc_dpb_password ) 
+                  {
+                     // nadpisujemy haslo
+                     passwd = hb_itemGetCPtr( xParamVal );
+                  }
+                  else {
+                     // dodajemy parametr i jego wartosc do dpb
+                     if ( ! fb_pb_add_char( dpb, sizeof( dpb ), &i, nParamTypeN ) ||
+                        ! fb_pb_add_str( dpb, sizeof( dpb ), &i, ( char * ) hb_itemGetCPtr( xParamVal ), hb_itemGetCLen( xParamVal ) ) )
+                     {
+                        // koniec bufora
+                        hb_retnl( 1 );
+                        return;                        
+                     }
+                  }
+               } 
+               else if ( HB_IS_NUMERIC( xParamVal ) ) {
+                  if ( nParamTypeN == isc_dpb_sweep_interval ) {
+                     int val = hb_itemGetNL( xParamVal );
+                     if ( ! fb_pb_add_char( dpb, sizeof( dpb ), &i, nParamTypeN ) ||
+                        ! fb_pb_add_str( dpb, sizeof( dpb ), &i, ( char * ) &val, sizeof( int ) ) )
+                     {
+                        // koniec bufora
+                        hb_retnl( 1 );
+                        return;                        
+                     }
+                  }
+                  else
+                  {
+                     if ( ! fb_pb_add_char( dpb, sizeof( dpb ), &i, nParamTypeN ) ||
+                        ! fb_pb_add_char( dpb, sizeof( dpb ), &i, 1 ) ||
+                        ! fb_pb_add_char( dpb, sizeof( dpb ), &i, ( char ) hb_itemGetNI( xParamVal ) ) )
+                     {
+                        // koniec bufora
+                        hb_retnl( 1 );
+                        return;                        
+                     }
+                  }
+               }
+            }
          }
       }
-      // dodajemy uzytkownika i haslo do dpb
-      dpb[ i++ ] = isc_dpb_user_name;
-      len        = ( int ) strlen( user );
-      if( len > ( int ) ( sizeof( dpb ) - i - 4 ) )
-         len = ( int ) ( sizeof( dpb ) - i - 4 );
-      dpb[ i++ ] = ( char ) len;
-      hb_strncpy( &( dpb[ i ] ), user, len );
-      i += ( short ) len;
-      dpb[ i++ ] = isc_dpb_password;
-      len        = ( int ) strlen( passwd );
-      if( len > ( int ) ( sizeof( dpb ) - i - 2 ) )
-         len = ( int ) ( sizeof( dpb ) - i - 2 );
-      dpb[ i++ ] = ( char ) len;
-      hb_strncpy( &( dpb[ i ] ), passwd, len );
-      i += ( short ) len;
    }
-   else {
-      /* TOFIX: Possible buffer overflow. Use hb_snprintf(). */
-      dpb[ i++ ] = isc_dpb_version1;
-      dpb[ i++ ] = isc_dpb_user_name;
-      len        = ( int ) strlen( user );
-      if( len > ( int ) ( sizeof( dpb ) - i - 4 ) )
-         len = ( int ) ( sizeof( dpb ) - i - 4 );
-      dpb[ i++ ] = ( char ) len;
-      hb_strncpy( &( dpb[ i ] ), user, len );
-      i += ( short ) len;
-      dpb[ i++ ] = isc_dpb_password;
-      len        = ( int ) strlen( passwd );
-      if( len > ( int ) ( sizeof( dpb ) - i - 2 ) )
-         len = ( int ) ( sizeof( dpb ) - i - 2 );
-      dpb[ i++ ] = ( char ) len;
-      hb_strncpy( &( dpb[ i ] ), passwd, len );
-      i += ( short ) len;
+   // dodajemy uzytkownika i haslo do dpb
+   if ( ! fb_pb_add_char( dpb, sizeof( dpb ), &i, isc_dpb_user_name ) ||
+      ! fb_pb_add_str( dpb, sizeof( dpb ), &i, ( char * ) user, strlen( user ) ) ||
+      ! fb_pb_add_char( dpb, sizeof( dpb ), &i, isc_dpb_password ) ||
+      ! fb_pb_add_str( dpb, sizeof( dpb ), &i, ( char * ) passwd, strlen( passwd ) ) )
+   {
+      // koniec bufora
+      hb_retnl( 1 );
+      return;                        
    }
 
    if( isc_attach_database( status, 0, db_connect, &db, i, dpb ) )
