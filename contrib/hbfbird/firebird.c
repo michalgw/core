@@ -120,6 +120,51 @@ static const HB_GC_FUNCS s_gcQuad =
    hb_gcDummyMark
 };
 
+static HB_GARBAGE_FUNC( FB_svc_handle_release )
+{
+   isc_db_handle * ph = ( isc_db_handle * ) Cargo;
+
+   /* Check if pointer is not NULL to avoid multiple freeing */
+   if( ph && *ph )
+   {
+      ISC_STATUS_ARRAY status;
+
+      /* Destroy the object */
+      isc_service_detach( status, ph );
+
+      /* set pointer to NULL to avoid multiple freeing */
+      *ph = 0;
+   }
+}
+
+static const HB_GC_FUNCS s_gcFB_svc_handleFuncs =
+{
+   FB_svc_handle_release,
+   hb_gcDummyMark
+};
+
+static void hb_FB_svc_handle_ret( isc_svc_handle p )
+{
+   if( p )
+   {
+      isc_svc_handle * ph = ( isc_svc_handle * )
+                           hb_gcAllocate( sizeof( isc_svc_handle ), &s_gcFB_svc_handleFuncs );
+
+      *ph = p;
+
+      hb_retptrGC( ph );
+   }
+   else
+      hb_retptr( NULL );
+}
+
+static isc_svc_handle hb_FB_svc_handle_par( int iParam )
+{
+   isc_svc_handle * ph = ( isc_svc_handle * ) hb_parptrGC( &s_gcFB_svc_handleFuncs, iParam );
+
+   return ph ? *ph : 0;
+}
+
 int fb_pb_add_char( char * buffer, int buflen, short * pos, char val )
 {
    if ( *pos < buflen - 1 )
@@ -145,6 +190,32 @@ int fb_pb_add_str( char * buffer, int buflen, short * pos, char * val, int valle
       return vallen;
    }
    return 0;
+}
+
+int fb_pb_add_uint( char * buffer, int buflen, short * pos, unsigned int val )
+{
+   if ( *pos < buflen - 5 )
+   {
+      buffer[ *pos++ ] = (ISC_SCHAR) (ISC_UCHAR) (val);
+      buffer[ *pos++ ] = (ISC_SCHAR) (ISC_UCHAR) ((val) >> 8);
+      buffer[ *pos++ ] = (ISC_SCHAR) (ISC_UCHAR) ((val) >> 16);
+      buffer[ *pos++ ] = (ISC_SCHAR) (ISC_UCHAR) ((val) >> 24);
+      return 4;
+   }
+   return 0;
+}
+
+HB_FUNC( FBVAXINTEGER )
+{
+   const char * data = hb_parcx( 1 );
+   int len = hb_parni( 2 );
+
+   if ( data && len )
+   {
+      hb_retnl( isc_vax_integer( data, len ) );
+   }
+   else
+      hb_errRT_BASE( EG_ARG, 2020, NULL, HB_ERR_FUNCNAME, HB_ERR_ARGS_BASEPARAMS );
 }
 
 /* API wrappers */
@@ -195,19 +266,19 @@ HB_FUNC( FBCONNECT )
    fb_pb_add_char( dpb, sizeof( dpb ), &i, isc_dpb_version1 );
 
    // Mamy dodatkowe parametry
-   if ( aParams ) 
+   if ( aParams )
    {
 
       // liczba parametrow w tablicy
       int paramCount = hb_arrayLen( aParams );
 
       // pobieramy kolejne parametry z tablicy
-      for (int cnt = 1; cnt <= paramCount; cnt++) 
+      for (int cnt = 1; cnt <= paramCount; cnt++)
       {
 
          // pojedyncy parametr
          PHB_ITEM xParam = hb_itemArrayGet( aParams, cnt );
-         
+
          // jesli to numer to dodajemy to struktury dpb
          if ( HB_IS_NUMERIC( xParam ) ) {
             if ( ! fb_pb_add_char( dpb, sizeof( dpb ), &i, ( char ) hb_itemGetNI( xParam ) ) ||
@@ -220,28 +291,28 @@ HB_FUNC( FBCONNECT )
             }
 
          // jesli tablica 2-elementowa to pierwszy element jest typem parametru a drugi jest wartoscia
-         } 
-         else if ( HB_IS_ARRAY( xParam ) && hb_arrayLen( xParam ) == 2 ) 
+         }
+         else if ( HB_IS_ARRAY( xParam ) && hb_arrayLen( xParam ) == 2 )
          {
             // typ parametru dpb
             PHB_ITEM nParamType = hb_itemArrayGet( xParam, 1 );
-            
+
             // akceptujemy tylko liczby
-            if ( HB_IS_NUMERIC( nParamType ) ) 
+            if ( HB_IS_NUMERIC( nParamType ) )
             {
                char nParamTypeN = ( char ) hb_itemGetNI( nParamType );
-               
+
                // drugi element tablicy to wartosc parametru
                PHB_ITEM xParamVal = hb_itemArrayGet( xParam, 2 );
-               
-               if ( HB_IS_STRING( xParamVal ) ) 
+
+               if ( HB_IS_STRING( xParamVal ) )
                {
-                  if ( nParamTypeN == isc_dpb_user_name ) 
+                  if ( nParamTypeN == isc_dpb_user_name )
                   {
                      // nadpisujemy nazwe uzytkownika
                      user = hb_itemGetCPtr( xParamVal );
                   }
-                  else if ( nParamTypeN == isc_dpb_password ) 
+                  else if ( nParamTypeN == isc_dpb_password )
                   {
                      // nadpisujemy haslo
                      passwd = hb_itemGetCPtr( xParamVal );
@@ -253,19 +324,19 @@ HB_FUNC( FBCONNECT )
                      {
                         // koniec bufora
                         hb_retnl( 1 );
-                        return;                        
+                        return;
                      }
                   }
-               } 
+               }
                else if ( HB_IS_NUMERIC( xParamVal ) ) {
                   if ( nParamTypeN == isc_dpb_sweep_interval ) {
-                     int val = hb_itemGetNL( xParamVal );
                      if ( ! fb_pb_add_char( dpb, sizeof( dpb ), &i, nParamTypeN ) ||
-                        ! fb_pb_add_str( dpb, sizeof( dpb ), &i, ( char * ) &val, sizeof( int ) ) )
+                        ! fb_pb_add_char( dpb, sizeof( dpb ), &i, 4 ) ||
+                        ! fb_pb_add_uint( dpb, sizeof( dpb ), &i, hb_itemGetNL( xParamVal ) ) )
                      {
                         // koniec bufora
                         hb_retnl( 1 );
-                        return;                        
+                        return;
                      }
                   }
                   else
@@ -276,7 +347,7 @@ HB_FUNC( FBCONNECT )
                      {
                         // koniec bufora
                         hb_retnl( 1 );
-                        return;                        
+                        return;
                      }
                   }
                }
@@ -292,7 +363,7 @@ HB_FUNC( FBCONNECT )
    {
       // koniec bufora
       hb_retnl( 1 );
-      return;                        
+      return;
    }
 
    if( isc_attach_database( status, 0, db_connect, &db, i, dpb ) )
@@ -341,20 +412,26 @@ HB_FUNC( FBSTARTTRANSACTION )
    {
       isc_tr_handle    trans = ( isc_tr_handle ) 0;
       ISC_STATUS_ARRAY status;
-     char tpb[ 64 ];
-     int len = 0;
-     unsigned int i = 0;
-     char * ptpb = NULL;
-     
-     if ( aParams ) {
-        for ( i = 0; i < hb_arrayLen( aParams ); i++ ) {
-           tpb[i] = (char) hb_arrayGetNI( aParams, i + 1 );
-        }
-        len = hb_arrayLen( aParams );
-        if ( len ) {
-           ptpb = &tpb[0];         
-        }
-     }
+      char tpb[ 64 ];
+      short len = 0;
+      unsigned int i;
+      char * ptpb = NULL;
+
+      if ( aParams ) {
+
+         for ( i = 1; i <= hb_arrayLen( aParams ); i++ )
+         {
+            if ( ! fb_pb_add_char( tpb, sizeof( tpb ), &len, ( char ) hb_arrayGetNI( aParams, i ) ) )
+            {
+               hb_retnl( 1 );
+               return;
+            }
+         }
+         if ( len )
+         {
+            ptpb = &tpb[0];
+         }
+      }
 
       if( isc_start_transaction( status, &trans, 1, &db, len, ptpb ) )
          hb_retnl( isc_sqlcode( status ) );
@@ -413,7 +490,7 @@ HB_FUNC( FBCOMMITRETAINING )
          hb_retnl( 1 );
    }
    else
-      hb_errRT_BASE( EG_ARG, 2020, NULL, HB_ERR_FUNCNAME, HB_ERR_ARGS_BASEPARAMS );   
+      hb_errRT_BASE( EG_ARG, 2020, NULL, HB_ERR_FUNCNAME, HB_ERR_ARGS_BASEPARAMS );
 }
 
 HB_FUNC( FBROLLBACKRETAINING )
@@ -430,7 +507,7 @@ HB_FUNC( FBROLLBACKRETAINING )
          hb_retnl( 1 );
    }
    else
-      hb_errRT_BASE( EG_ARG, 2020, NULL, HB_ERR_FUNCNAME, HB_ERR_ARGS_BASEPARAMS );   
+      hb_errRT_BASE( EG_ARG, 2020, NULL, HB_ERR_FUNCNAME, HB_ERR_ARGS_BASEPARAMS );
 }
 
 HB_FUNC( FBEXECUTE )
@@ -665,11 +742,11 @@ HB_FUNC( FBFREE )
       isc_stmt_handle  stmt  = ( isc_stmt_handle ) ( HB_PTRUINT ) hb_itemGetPtr( hb_itemArrayGet( aParam, 1 ) );
       XSQLDA *         sqlda = ( XSQLDA * ) hb_itemGetPtr( hb_itemArrayGet( aParam, 2 ) );
       isc_tr_handle    trans = ( isc_tr_handle ) ( HB_PTRUINT ) hb_itemGetPtr( hb_itemArrayGet( aParam, 3 ) );
-      ISC_STATUS_ARRAY status;      
+      ISC_STATUS_ARRAY status;
       XSQLDA *         parsqlda = NULL;
       int              i;
       XSQLVAR *        var;
-      
+
       /* Used by TFBQueryCreate */
       if ( hb_arrayLen( aParam ) >= 8 )
       {
@@ -698,7 +775,7 @@ HB_FUNC( FBFREE )
          }
          hb_xfree( sqlda );
       }
-      
+
       if( parsqlda )
       {
          for( i = 0, var = parsqlda->sqlvar; i < parsqlda->sqld; i++, var++ )
@@ -1002,22 +1079,22 @@ HB_FUNC( FBSQLCREATE )
          hb_retnl( isc_sqlcode( status ) );
          return;
       }
-     
+
       char stmtypebuf[8];
       char stmitemtype[] = {isc_info_sql_stmt_type};
-     
+
       if (isc_dsql_sql_info( status, &stmt, sizeof( char ), stmitemtype, sizeof( stmtypebuf ), stmtypebuf ) )
       {
          hb_retnl( isc_sqlcode( status ) );
          return;
       }
-     
+
       if ( stmtypebuf[0] != isc_info_sql_stmt_type )
       {
          hb_retnl( 0 );
-         return;       
+         return;
       }
-     
+
       int stmtlen = isc_vax_integer( &stmtypebuf[1], 2 );
       int stmttype = isc_vax_integer( &stmtypebuf[3], stmtlen );
 
@@ -1038,12 +1115,12 @@ HB_FUNC( FBSQLCREATE )
          case isc_info_sql_stmt_set_generator:
 
             aTemp    = hb_itemNew( NULL );
-         
+
             /* Allocate an input SQLDA. Just to check number of params */
             parsqlda          = ( XSQLDA * ) hb_xgrab( XSQLDA_LENGTH( 1 ) );
             parsqlda->sqln    = 1;
             parsqlda->version = 1;
-           
+
             /* Describe params (if any) */
             if( isc_dsql_describe_bind( status, &stmt, dialect, parsqlda ) )
             {
@@ -1089,7 +1166,7 @@ HB_FUNC( FBSQLCREATE )
                      else
                      {
                         var->sqldata = ( char * ) hb_xgrab( sizeof( char ) * 1 );
-                     }                     
+                     }
                      break;
                }
 
@@ -1108,7 +1185,7 @@ HB_FUNC( FBSQLCREATE )
 
                hb_arraySetForward( aNewPar, i + 1, aTemp );
             }
-            
+
             switch( stmttype )
             {
                case isc_info_sql_stmt_select:
@@ -1167,7 +1244,7 @@ HB_FUNC( FBSQLCREATE )
                            else
                            {
                               var->sqldata = ( char * ) hb_xgrab( sizeof( char ) * 1 );
-                           }                     
+                           }
                            break;
                      }
 
@@ -1191,9 +1268,9 @@ HB_FUNC( FBSQLCREATE )
             }
             hb_itemRelease( aTemp );
             break;
-            
+
          default:
-            
+
             break;
 
       }
@@ -1214,13 +1291,13 @@ HB_FUNC( FBSQLCREATE )
       /* Query params */
       hb_arraySetPtr( qry_handle, 8, ( void * ) ( HB_PTRUINT ) parsqlda );
       hb_arraySetForward( qry_handle, 9, aNewPar );
-      
+
       hb_itemReturnRelease( qry_handle );
       hb_itemRelease( aNew );
       hb_itemRelease( aNewPar );
    }
    else
-      hb_errRT_BASE( EG_ARG, 2020, NULL, HB_ERR_FUNCNAME, HB_ERR_ARGS_BASEPARAMS ); 
+      hb_errRT_BASE( EG_ARG, 2020, NULL, HB_ERR_FUNCNAME, HB_ERR_ARGS_BASEPARAMS );
 }
 
 HB_FUNC( FBSQLEXEC )
@@ -1235,7 +1312,7 @@ HB_FUNC( FBSQLEXEC )
       ISC_STATUS_ARRAY status;
       unsigned short   dialect = ( unsigned short ) hb_itemGetNI( hb_itemArrayGet( aParam, 5 ) );
       int              stattype = hb_itemGetNI( hb_itemArrayGet( aParam, 7 ) );
-      
+
       switch (stattype)
       {
          case isc_info_sql_stmt_select:
@@ -1246,7 +1323,7 @@ HB_FUNC( FBSQLEXEC )
                hb_retnl( isc_sqlcode( status ) );
                return;
             }
-            
+
             /* set cursor name */
             if ( ( hb_parinfo( 0 ) > 1 ) && ( hb_parcx( 2 ) ) )
             {
@@ -1256,7 +1333,7 @@ HB_FUNC( FBSQLEXEC )
                   return;
                }
             }
-            
+
             break;
          case isc_info_sql_stmt_exec_procedure:
             if( isc_dsql_execute2( status, &trans, &stmt, dialect, insqlda, sqlda ) )
@@ -1276,7 +1353,7 @@ HB_FUNC( FBSQLEXEC )
       hb_retnl(0);
    }
    else
-      hb_errRT_BASE( EG_ARG, 2020, NULL, HB_ERR_FUNCNAME, HB_ERR_ARGS_BASEPARAMS ); 
+      hb_errRT_BASE( EG_ARG, 2020, NULL, HB_ERR_FUNCNAME, HB_ERR_ARGS_BASEPARAMS );
 }
 
 HB_FUNC( FBSQLSETPARAM )
@@ -1300,7 +1377,7 @@ HB_FUNC( FBSQLSETPARAM )
       }
 
       var = sqlda->sqlvar + pos;
-     
+
       if ( HB_IS_NIL( xValue ) )
       {
          if( var->sqltype & 1 ) {
@@ -1318,7 +1395,7 @@ HB_FUNC( FBSQLSETPARAM )
       {
          struct tm timest;
          int iYear = 0, iMonth = 0, iDay = 0, iHour = 0, iMinute = 0, iSecond = 0, iMSec = 0;
-         
+
          switch ( HB_ITEM_TYPE( xValue ) )
          {
             case HB_IT_INTEGER:
@@ -1355,7 +1432,7 @@ HB_FUNC( FBSQLSETPARAM )
                {
                   hb_dateDecode( hb_itemGetDL( xValue ), &iYear, &iMonth, &iDay );
                }
-               
+
                timest.tm_year = iYear - 1900;
                timest.tm_mon = iMonth - 1;
                timest.tm_mday = iDay;
@@ -1363,7 +1440,7 @@ HB_FUNC( FBSQLSETPARAM )
                timest.tm_min = iMinute;
                timest.tm_sec = iSecond;
                /* TODO: Miliseconds ? */
-               
+
                if ( HB_IS_TIMESTAMP( xValue ) )
                {
                   var->sqltype = SQL_TIMESTAMP | ( var->sqltype & 1 );
@@ -1389,7 +1466,7 @@ HB_FUNC( FBSQLSETPARAM )
                   vals = ( short ) ISC_TRUE;
                else
                   vals = ( short ) ISC_FALSE;
-               hb_xmemcpy( var->sqldata, &vals, sizeof( short ));               
+               hb_xmemcpy( var->sqldata, &vals, sizeof( short ));
                break;
             case HB_IT_STRING:
                var->sqltype = SQL_TEXT | ( var->sqltype & 1 );
@@ -1453,7 +1530,7 @@ HB_FUNC( FBSQLGETDATA )
             case SQL_TEXT:
                hb_retclen( var->sqldata, var->sqllen );
                break;
-            
+
             case SQL_VARYING:
                str_len = isc_vax_integer( var->sqldata, 2 );
                hb_retclen( ( char * ) var->sqldata + 2, str_len );
@@ -1541,26 +1618,26 @@ HB_FUNC( FBSQLGETDATA )
                      case SQL_LONG:
                         dval = valint;
                         break;
-                        
+
                      case SQL_INT64:
                         dval = value;
                         break;
-                        
+
                   }
                   dval = dval / tens;
                   hb_retndlen( dval, field_width, -dscale );
                }
-               else 
+               else
                   switch( dtype )
                   {
                      case SQL_SHORT:
                      case SQL_LONG:
                         hb_retnllen( valint, field_width );
                         break;
-                        
+
                      case SQL_INT64:
                         hb_retnint( value );
-                        break;                     
+                        break;
                   }
                break;
             }
@@ -1588,24 +1665,24 @@ HB_FUNC( FBBLOBWRITERCREATE )
    PHB_ITEM         aRes;
    isc_tr_handle    trans = ( isc_tr_handle ) ( HB_PTRUINT ) hb_parptr( 2 );
    isc_blob_handle  blob_handle = NULL;
-   
+
    if( db && trans )
    {
 
       blob_id = ( ISC_QUAD * ) hb_gcAllocate( sizeof( ISC_QUAD ), &s_gcQuad );
-      
+
       if ( isc_create_blob2( status, &db, &trans, &blob_handle, blob_id, 0, NULL ) )
       {
          hb_gcFree( blob_id );
          hb_retnl( isc_sqlcode( status ) );
          return;
       }
-      
+
       aRes = hb_itemArrayNew( 2 );
-      
+
       hb_arraySetPtrGC( aRes, 1, ( void * ) ( HB_PTRUINT ) blob_id );
       hb_arraySetPtr( aRes, 2, ( void * ) ( HB_PTRUINT ) blob_handle );
-      
+
       hb_itemReturnRelease( aRes );
    }
    else
@@ -1615,7 +1692,7 @@ HB_FUNC( FBBLOBWRITERCREATE )
 HB_FUNC( FBBLOBWRITERWRITE )
 {
    PHB_ITEM aParam = hb_param( 1, HB_IT_ARRAY );
-   
+
    if ( aParam ) {
       const char *     data = hb_parc( 2 );
       int              len = hb_parni( 3 );
@@ -1626,9 +1703,9 @@ HB_FUNC( FBBLOBWRITERWRITE )
       {
          len = hb_parclen( 2 );
       }
-      
+
       blob_handle = ( isc_blob_handle * ) hb_arrayGetPtr( aParam, 2 );
-      
+
       if ( blob_handle )
       {
          if ( isc_put_segment( status, &blob_handle, len, data ) )
@@ -1636,8 +1713,8 @@ HB_FUNC( FBBLOBWRITERWRITE )
             hb_retnl( isc_sqlcode( status ) );
             return;
          }
-         
-         hb_retl( HB_TRUE );         
+
+         hb_retl( HB_TRUE );
       }
       else
          hb_retnl( 1 );
@@ -1654,31 +1731,31 @@ HB_FUNC( FBBLOBREADERCREATE )
    PHB_ITEM         aRes = NULL;
    isc_tr_handle    trans = ( isc_tr_handle ) ( HB_PTRUINT ) hb_parptr( 2 );
    isc_blob_handle  blob_handle = NULL;
-   
+
    if( db && trans && blob_id )
    {
-      
+
       if ( isc_open_blob2( status, &db, &trans, &blob_handle, blob_id, 0, NULL ) )
       {
          hb_gcFree( blob_id );
          hb_retnl( isc_sqlcode( status ) );
          return;
       }
-      
+
       char blob_items[] = {
          isc_info_blob_num_segments,
          isc_info_blob_max_segment,
          isc_info_blob_total_length,
          isc_info_blob_type };
-      
+
       char res_buffer[64], *p, item;
       short length;
-      
+
       if ( isc_blob_info( status, &blob_handle, sizeof( blob_items ), blob_items, sizeof( res_buffer ), res_buffer ) )
       {
          hb_gcFree( blob_id );
          hb_retnl( isc_sqlcode( status ) );
-         return;         
+         return;
       }
 
       aRes = hb_itemArrayNew( 6 );
@@ -1714,7 +1791,7 @@ HB_FUNC( FBBLOBREADERCREATE )
 
       hb_arraySetPtrGC( aRes, 1, ( void * ) ( HB_PTRUINT ) blob_id );
       hb_arraySetPtr( aRes, 2, ( void * ) ( HB_PTRUINT ) blob_handle );
-      
+
       hb_itemReturnRelease( aRes );
    }
    else
@@ -1724,7 +1801,7 @@ HB_FUNC( FBBLOBREADERCREATE )
 HB_FUNC( FBBLOBREADERREAD )
 {
    PHB_ITEM aParam = hb_param( 1, HB_IT_ARRAY );
-   
+
    if ( aParam ) {
       int              len = hb_parni( 2 );
       isc_blob_handle  blob_handle = ( isc_blob_handle ) hb_arrayGetPtr( aParam, 2 );
@@ -1740,39 +1817,39 @@ HB_FUNC( FBBLOBREADERREAD )
             hb_retnl( isc_sqlcode( status ) );
             return;
          }
-         
+
          hb_retclen( data, data_len );
-         
+
       }
       else
          hb_errRT_BASE( EG_ARG, 2020, NULL, HB_ERR_FUNCNAME, HB_ERR_ARGS_BASEPARAMS );
    }
    else
       hb_errRT_BASE( EG_ARG, 2020, NULL, HB_ERR_FUNCNAME, HB_ERR_ARGS_BASEPARAMS );
-   
+
 }
 
 HB_FUNC( FBBLOBCLOSE )
 {
    PHB_ITEM aParam = hb_param( 1, HB_IT_ARRAY );
-   
+
    if ( aParam ) {
 
       isc_blob_handle  blob_handle = ( isc_blob_handle ) hb_arrayGetPtr( aParam, 2 );
       ISC_STATUS_ARRAY status;
-      
+
       if ( blob_handle )
       {
          if ( isc_close_blob( status, &blob_handle ) )
          {
             hb_retnl( isc_sqlcode( status ) );
-            return;            
+            return;
          }
 
          hb_retl( HB_TRUE );
       }
       else
-         hb_errRT_BASE( EG_ARG, 2020, NULL, HB_ERR_FUNCNAME, HB_ERR_ARGS_BASEPARAMS );   
+         hb_errRT_BASE( EG_ARG, 2020, NULL, HB_ERR_FUNCNAME, HB_ERR_ARGS_BASEPARAMS );
    }
    else
       hb_errRT_BASE( EG_ARG, 2020, NULL, HB_ERR_FUNCNAME, HB_ERR_ARGS_BASEPARAMS );
@@ -1792,23 +1869,23 @@ HB_FUNC( FBDBGETINFO )
       ISC_STATUS_ARRAY status;
       char *           p;
       char             item;
-      
+
       for ( i = 1; ( i <= hb_arrayLen( aParams ) ) && ( i < sizeof( inparams ) ) ; i++ )
       {
          inparams[ i - 1 ] = ( char ) hb_arrayGetNI( aParams, i );
       }
-      
+
       inparams[ i ] = isc_info_end;
       len = i + 1;
-      
+
       if ( isc_database_info( status, &db, len, inparams, sizeof( resbuf ), resbuf ) )
       {
          hb_retnl( isc_sqlcode( status ) );
          return;
       }
-      
+
       aRes = hb_itemArrayNew( 0 );
-      
+
       for ( p = resbuf; *p != isc_info_end ; )
       {
          item = *p++;
@@ -1824,7 +1901,7 @@ HB_FUNC( FBDBGETINFO )
                hb_arraySetCL( aItem, 4, &p[ p[ 1 ] + 3 ], p[ p[ 1 ] + 2 ] );  // site name
                hb_arrayAdd( aRes, aItem );
                break;
-               
+
             case isc_info_reads:
             case isc_info_writes:
             case isc_info_fetches:
@@ -1867,7 +1944,7 @@ HB_FUNC( FBDBGETINFO )
             case isc_info_db_file_size:
                aItem = hb_itemArrayNew( 2 );
                hb_arraySetNI( aItem, 1, item );
-               hb_arraySetNI( aItem, 2, isc_vax_integer( p, len ) );
+               hb_arraySetNL( aItem, 2, isc_vax_integer( p, len ) );
                hb_arrayAdd( aRes, aItem );
                break;
 
@@ -1877,6 +1954,7 @@ HB_FUNC( FBDBGETINFO )
                hb_arraySetNI( aItem, 2, p[0] );                               // = 1
                hb_arraySetNI( aItem, 3, p[1] );                               // implementation number
                hb_arraySetNI( aItem, 4, p[2] );                               // class number
+               hb_arrayAdd( aRes, aItem );
                break;
 
             case isc_info_isc_version:
@@ -1894,7 +1972,7 @@ HB_FUNC( FBDBGETINFO )
                hb_arraySetNI( aItem, 3, p[1] );                               // version number
                hb_arrayAdd( aRes, aItem );
                break;
-               
+
             case isc_info_no_reserve:
             case isc_info_forced_writes:
             case isc_info_db_sql_dialect:
@@ -1910,22 +1988,179 @@ HB_FUNC( FBDBGETINFO )
                aItem = hb_itemArrayNew( 2 );
                hb_arraySetNI( aItem, 1, item );
                hb_arraySetCL( aItem, 2, &p[ 1 ], p[ 0 ] );
-               hb_arrayAdd( aRes, aItem );               
+               hb_arrayAdd( aRes, aItem );
                break;
-               
+
             case isc_info_creation_date:
                /* TODO */
                break;
-            
+
             default:
                break;
-            
+
          }
          p += len;
       }
 
       hb_itemReturnRelease( aRes );
 
+   }
+   else
+      hb_errRT_BASE( EG_ARG, 2020, NULL, HB_ERR_FUNCNAME, HB_ERR_ARGS_BASEPARAMS );
+}
+
+short fb_HB_create_spb( char * spb, short spb_len, short * len, PHB_ITEM aParams )
+{
+   int paramCount = hb_arrayLen( aParams );
+
+   for (int cnt = 1; cnt <= paramCount; cnt++)
+   {
+
+      PHB_ITEM xParam = hb_itemArrayGet( aParams, cnt );
+
+      if ( HB_IS_NUMERIC( xParam ) ) {
+         if ( ! fb_pb_add_char( spb, spb_len, len, ( char ) hb_itemGetNI( xParam ) ) )
+         {
+            return 0;
+         }
+
+      }
+      else if ( HB_IS_ARRAY( xParam ) && hb_arrayLen( xParam ) == 2 )
+      {
+         PHB_ITEM nParamType = hb_itemArrayGet( xParam, 1 );
+
+         if ( HB_IS_NUMERIC( nParamType ) )
+         {
+
+            PHB_ITEM xParamVal = hb_itemArrayGet( xParam, 2 );
+
+            if ( HB_IS_STRING( xParamVal ) )
+            {
+               if ( ! fb_pb_add_char( spb, spb_len, len, hb_itemGetNI( nParamType) ) ||
+                  ! fb_pb_add_str( spb, spb_len, len, ( char * ) hb_itemGetCPtr( xParamVal ), hb_itemGetCLen( xParamVal ) ) )
+               {
+                  return 0;
+               }
+            }
+            else if ( HB_IS_NUMERIC( xParamVal ) )
+            {
+               if ( ! fb_pb_add_char( spb, spb_len, len, hb_arrayGetNI( xParam, 1 ) ) ||
+                  ! fb_pb_add_uint( spb, spb_len, len, hb_itemGetNL( xParamVal ) ) )
+               {
+                  return 0;
+               }
+            }
+         }
+      }
+   }
+   return *len;
+}
+
+HB_FUNC( FBSVCATTACH )
+{
+   char           spb[ 256 ];
+   ISC_STATUS     status[ 20 ];
+   isc_svc_handle svc_handle = ( isc_svc_handle ) 0;
+   short          len        = 0;
+   const char *   svc_name   = hb_parcx( 1 );
+   PHB_ITEM       aParams    = hb_param( 2, HB_IT_ARRAY );
+
+   if ( aParams && svc_name )
+   {
+
+      fb_pb_add_char( spb, sizeof( spb ), &len, isc_spb_version );
+      fb_pb_add_char( spb, sizeof( spb ), &len, isc_spb_current_version );
+
+      if ( ! fb_HB_create_spb( spb, sizeof( spb ), &len, aParams ) )
+      {
+         hb_errRT_BASE( EG_ARG, 2020, NULL, HB_ERR_FUNCNAME, HB_ERR_ARGS_BASEPARAMS );
+      }
+
+
+      if ( isc_service_attach( status, 0, hb_parcx( 1 ), &svc_handle, len, spb ) )
+      {
+            hb_retnl( isc_sqlcode( status ) );
+            return;
+      }
+
+      hb_FB_svc_handle_ret( svc_handle );
+
+   }
+   else
+      hb_errRT_BASE( EG_ARG, 2020, NULL, HB_ERR_FUNCNAME, HB_ERR_ARGS_BASEPARAMS );
+}
+
+HB_FUNC( FBSVCSTART )
+{
+   isc_svc_handle svc_handle = hb_FB_svc_handle_par( 1 );
+   const char * params = hb_parcx( 2 );
+   short param_len = hb_parclen( 2 );
+   ISC_STATUS status[ 20 ];
+
+   if ( svc_handle && param_len )
+   {
+
+      if ( isc_service_start( status, &svc_handle, NULL, param_len, params ) )
+      {
+         hb_retnl( isc_sqlcode( status ) );
+         return;
+      }
+
+      hb_retnl( 0 );
+
+   }
+   else
+      hb_errRT_BASE( EG_ARG, 2020, NULL, HB_ERR_FUNCNAME, HB_ERR_ARGS_BASEPARAMS );
+}
+
+HB_FUNC( FBSVCQUERY )
+{
+   char spb[ 1024 ];
+   char * pspb               = NULL;
+   short len                 = 0;
+   isc_svc_handle svc_handle = hb_FB_svc_handle_par( 1 );
+   PHB_ITEM aParams          = hb_param( 2, HB_IT_ARRAY );
+   ISC_STATUS status[ 20 ];
+   const char * req          = hb_parcx( 3 );
+   int req_len               = hb_parni( 4 );
+   PHB_ITEM pBuffer          = hb_param( 5, HB_IT_STRING );
+   char * res_buf;
+   HB_SIZE nSize;
+
+   if ( svc_handle && req && req_len && HB_ISBYREF( 5 ) && hb_itemGetWriteCL( pBuffer, &res_buf, &nSize ) )
+   {
+
+      if ( aParams && hb_arrayLen( aParams ) )
+      {
+         if ( ! fb_HB_create_spb( spb, sizeof( spb ), &len, aParams ) )
+         {
+            hb_retnl( isc_sqlcode( status ) );
+            return;
+         }
+         pspb = spb;
+      }
+
+      if ( isc_service_query( status, &svc_handle, NULL, len, pspb, req_len, req, nSize, res_buf ) )
+      {
+         hb_retnl( isc_sqlcode( status ) );
+         return;
+      }
+
+      hb_retnl( 0 );
+
+   }
+   else
+      hb_errRT_BASE( EG_ARG, 2020, NULL, HB_ERR_FUNCNAME, HB_ERR_ARGS_BASEPARAMS );
+}
+
+HB_FUNC( FBSVCDETACH )
+{
+   isc_svc_handle svc_handle = hb_FB_svc_handle_par( 1 );
+   ISC_STATUS status[ 20 ];
+
+   if ( svc_handle )
+   {
+      isc_service_detach( status, &svc_handle );
    }
    else
       hb_errRT_BASE( EG_ARG, 2020, NULL, HB_ERR_FUNCNAME, HB_ERR_ARGS_BASEPARAMS );
