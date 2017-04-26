@@ -1,7 +1,7 @@
 /*
- * TIP Class oriented Internet protocol library
+ * hb_base64EncodeUrl(), hb_base64DecodeUrl()
  *
- * Copyright 2003 Giancarlo Niccolai <gian@niccolai.ws>
+ * Copyright 2014 Viktor Szakats (vszakats.net/harbour)
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -44,17 +44,8 @@
  *
  */
 
-#include "hbclass.ch"
+FUNCTION tip_base64EncodeUrl( ... )
+   RETURN hb_StrReplace( hb_base64Encode( ... ), "+/=", "-_" )
 
-/*
-* Credentials class
-* A way to give basic credentials
-*/
-
-CREATE CLASS TIPCredentials
-
-   VAR cMethod
-   VAR cUserid
-   VAR cPassword
-
-ENDCLASS
+FUNCTION tip_base64DecodeUrl( cString )
+   RETURN hb_base64Decode( hb_StrReplace( cString, "-_", "+/" ) )

@@ -178,8 +178,9 @@ extern void yyerror( HB_COMP_DECL, const char * );     /* parsing error manageme
 %token PRIVATE BEGINSEQ BREAK RECOVER RECOVERUSING ALWAYS ENDSEQ
 %token DO WITH SELF LINE
 %token MACROVAR MACROTEXT
-%token AS_ARRAY AS_BLOCK AS_CHARACTER AS_CLASS AS_DATE AS_LOGICAL AS_NUMERIC AS_OBJECT AS_VARIANT DECLARE OPTIONAL DECLARE_CLASS DECLARE_MEMBER
+%token AS_ARRAY AS_BLOCK AS_CHARACTER AS_CLASS AS_DATE AS_LOGICAL AS_NUMERIC AS_OBJECT AS_VARIANT
 %token AS_ARRAY_ARRAY AS_BLOCK_ARRAY AS_CHARACTER_ARRAY AS_CLASS_ARRAY AS_DATE_ARRAY AS_LOGICAL_ARRAY AS_NUMERIC_ARRAY AS_OBJECT_ARRAY
+%token DECLARE OPTIONAL DECLARE_CLASS DECLARE_MEMBER
 %token PROCREQ
 %token CBSTART DOIDENT
 %token FOREACH DESCEND
@@ -1636,8 +1637,8 @@ ForNext    : FOR LValue ForAssign Expression          /* 1  2  3  4 */
 
                   hb_compGenJumpFalse( $<sNumber>11 - HB_COMP_PARAM->functions.pLast->nPCodePos, HB_COMP_PARAM );
                   hb_compLoopEnd( HB_COMP_PARAM );
-                  if( hb_compExprAsSymbol( $<asExpr>2 ) )
-                     hb_compForEnd( HB_COMP_PARAM, hb_compExprAsSymbol( $<asExpr>2 ) );
+                  if( hb_compExprAsSymbol( $2 ) )
+                     hb_compForEnd( HB_COMP_PARAM, hb_compExprAsSymbol( $2 ) );
                   HB_COMP_EXPR_FREE( $<asExpr>5 );  /* deletes $5, $2, $4 */
                   HB_COMP_PARAM->functions.pLast->funFlags &= ~ ( HB_FUNF_WITH_RETURN | HB_FUNF_BREAK_CODE );
                }
