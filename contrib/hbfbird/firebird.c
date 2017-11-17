@@ -1,5 +1,4 @@
 /*
- * Firebird RDBMS low level (client api) interface code.
  *
  * Copyright 2003 Rodrigo Moreno rodrigo_moreno@yahoo.com
  *           2017 Michal Gawrycki ( info / gmsystems/ pl )
@@ -15,9 +14,9 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this software; see the file COPYING.txt.  If not, write to
- * the Free Software Foundation, Inc., 59 Temple Place, Suite 330,
- * Boston, MA 02111-1307 USA (or visit the web site https://www.gnu.org/).
+ * along with this program; see the file LICENSE.txt.  If not, write to
+ * the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+ * Boston, MA 02110-1301 USA (or visit https://www.gnu.org/licenses/).
  *
  * As a special exception, the Harbour Project gives permission for
  * additional uses of the text contained in its release of Harbour.
@@ -42,8 +41,6 @@
  * If you write modifications of your own for Harbour, it is your choice
  * whether to permit this exception to apply to your modifications.
  * If you do not wish that, delete this exception notice.
- *
- * See COPYING.txt for licensing terms.
  *
  */
 
@@ -723,11 +720,11 @@ HB_FUNC( FBFETCH )
       ISC_STATUS_ARRAY status;
       unsigned short   dialect = ( unsigned short ) hb_itemGetNI( hb_itemArrayGet( aParam, 5 ) );
 
-      /* TOFIX */
+      /* FIXME */
       hb_retnl( isc_dsql_fetch( status,
                                 &stmt,
                                 dialect,
-                                sqlda ) == 100L ? -1 : isc_sqlcode( status ) );
+                                sqlda ) == 100 ? -1 : isc_sqlcode( status ) );
    }
    else
       hb_retnl( 0 );
@@ -765,6 +762,7 @@ HB_FUNC( FBFREE )
          return;
       }
 
+      /* FIXME: Freeing pointer received as parameter? We should at least set the item NULL. */
       if( sqlda )
       {
          for( i = 0, var = sqlda->sqlvar; i < sqlda->sqld; i++, var++ )
@@ -802,7 +800,6 @@ HB_FUNC( FBGETDATA )
       XSQLVAR *        var;
       XSQLDA *         sqlda = ( XSQLDA * ) hb_itemGetPtr( hb_itemArrayGet( aParam, 2 ) );
       ISC_STATUS_ARRAY status;
-      ISC_QUAD *       blob_id;
 
       int pos = hb_parni( 2 ) - 1;
 
@@ -869,10 +866,11 @@ HB_FUNC( FBGETDATA )
                break;
 
             case SQL_BLOB:
-               blob_id = ( ISC_QUAD * ) var->sqldata;
+            {
+               ISC_QUAD * blob_id = ( ISC_QUAD * ) var->sqldata;
                hb_retptr( ( void * ) blob_id );
                break;
-
+            }
             case SQL_SHORT:
             case SQL_LONG:
             case SQL_INT64:

@@ -1,5 +1,5 @@
 /*
- * Firebird RDBMS low level (client api) interface code.
+ * Firebird RDBMS low-level (client API) interface code.
  *
  * Copyright 2003 Rodrigo Moreno rodrigo_moreno@yahoo.com
  *           2017 Michal Gawrycki ( info / gmsystems / pl )
@@ -15,9 +15,9 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this software; see the file COPYING.txt.  If not, write to
- * the Free Software Foundation, Inc., 59 Temple Place, Suite 330,
- * Boston, MA 02111-1307 USA (or visit the web site https://www.gnu.org/).
+ * along with this program; see the file LICENSE.txt.  If not, write to
+ * the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+ * Boston, MA 02110-1301 USA (or visit https://www.gnu.org/licenses/).
  *
  * As a special exception, the Harbour Project gives permission for
  * additional uses of the text contained in its release of Harbour.
@@ -43,8 +43,6 @@
  * whether to permit this exception to apply to your modifications.
  * If you do not wish that, delete this exception notice.
  *
- * See COPYING.txt for licensing terms.
- *
  */
 
 #include "hbclass.ch"
@@ -52,20 +50,20 @@
 
 CREATE CLASS TFbServer
 
-   VAR      db
-   VAR      trans
-   VAR      StartedTrans
-   VAR      nError
-   VAR      lError
-   VAR      dialect
+   VAR db
+   VAR trans
+   VAR StartedTrans
+   VAR nError
+   VAR lError
+   VAR dialect
 
    METHOD   New( cServer, cUser, cPassword, nDialect, aParams )
    METHOD   Destroy()  INLINE FBClose( ::db )
    METHOD   Close()    INLINE FBClose( ::db )
 
-   METHOD   TableExists( cTable )
-   METHOD   ListTables()
-   METHOD   TableStruct( cTable )
+   METHOD TableExists( cTable )
+   METHOD ListTables()
+   METHOD TableStruct( cTable )
 
    METHOD   StartTransaction( aParams )
    METHOD   Commit()
@@ -78,9 +76,9 @@ CREATE CLASS TFbServer
    METHOD   Delete( oRow, cWhere, oTransaction )
    METHOD   Append( oRow, oTransaction )
 
-   METHOD   NetErr()   INLINE ::lError
-   METHOD   Error()    INLINE FBError( ::nError )
-   METHOD   ErrorNo()  INLINE ::nError
+   METHOD NetErr()   INLINE ::lError
+   METHOD Error()    INLINE FBError( ::nError )
+   METHOD ErrorNo()  INLINE ::nError
 
    METHOD   GetInfo( aInfos )
 
@@ -102,7 +100,7 @@ METHOD New( cServer, cUser, cPassword, nDialect, aParams ) CLASS TFbServer
       ::nError := ::db
    ENDIF
 
-   RETURN self
+   RETURN Self
 
 METHOD StartTransaction( aParams ) CLASS TFbServer
 
@@ -776,7 +774,7 @@ METHOD New( nDB, cQuery, nDialect, oTransaction ) CLASS TFbQuery
 
    ::Refresh()
 
-   RETURN self
+   RETURN Self
 
 METHOD Refresh() CLASS TFbQuery
 
@@ -809,7 +807,7 @@ METHOD Refresh() CLASS TFbQuery
    IF HB_ISARRAY( qry )
       ::numcols := qry[ 4 ]
 
-      /* TOFIX: This is faulty code. ::aStruct will become zero length, out of sync with ::numcols. */
+      /* FIXME: This is faulty code. ::aStruct will become zero length, out of sync with ::numcols. */
       ::aStruct := StructConvert( qry[ 6 ], ::db, ::dialect )
 
       ::lError := .F.
@@ -1078,7 +1076,7 @@ METHOD new( row, struct, nDb, nDialect, aTable ) CLASS TFbRow
    ::aTables := aTable
    ::aChanged := Array( Len( row ) )
 
-   RETURN self
+   RETURN Self
 
 METHOD Changed( nField ) CLASS TFbRow
 
