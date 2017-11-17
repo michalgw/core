@@ -1867,6 +1867,8 @@ HB_FUNC( FBDBGETINFO )
       ISC_STATUS_ARRAY status;
       char *           p;
       char             item;
+      ISC_TIMESTAMP    ts;
+      struct tm        times;
 
       for ( i = 1; ( i <= hb_arrayLen( aParams ) ) && ( i < sizeof( inparams ) ) ; i++ )
       {
@@ -1889,6 +1891,7 @@ HB_FUNC( FBDBGETINFO )
          item = *p++;
          len = isc_vax_integer( p, 2 );
          p += 2;
+
          switch ( item )
          {
             case isc_info_db_id:
@@ -1990,7 +1993,20 @@ HB_FUNC( FBDBGETINFO )
                break;
 
             case isc_info_creation_date:
-               /* TODO */
+               ts.timestamp_date = isc_vax_integer( p, 4 );
+               ts.timestamp_time = isc_vax_integer( p + 4, 4 );
+               isc_decode_timestamp( &ts, &times );
+               aItem = hb_itemArrayNew( 2 );
+               hb_arraySetNI( aItem, 1, item );
+               hb_arraySetTD( aItem, 2, hb_timeStampPackD(
+                           times.tm_year + 1900,
+                           times.tm_mon + 1,
+                           times.tm_mday,
+                           times.tm_hour,
+                           times.tm_min,
+                           times.tm_sec +
+                           ( ( int ) ts.timestamp_time % 10000 ) / 10000 ) );
+               hb_arrayAdd( aRes, aItem );
                break;
 
             default:
