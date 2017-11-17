@@ -184,7 +184,7 @@ FUNCTION Main()
    DO WHILE n <> 0
       @ 0, 0 CLEAR TO MaxRow(), MaxCol()
       @ 0, 0 TO MaxRow(), MaxCol()
-      n := AChoice( 1, 1, MaxRow() - 1, MaxCol() - 1, aInfoList )
+      n := AChoice( 1, 1, MaxRow() - 1, MaxCol() - 1, aInfoList, , , n )
       IF n > 0
          aRes := oDatabase:GetInfo( { aInfoVals[ n ] } )
          IF HB_ISARRAY( aRes ) .AND. Len( aRes ) > 0
@@ -192,8 +192,8 @@ FUNCTION Main()
             FOR i := 1 TO Len( aRes[ 1 ] )
                IF HB_ISNUMERIC( aRes[ 1 ][ i ] )
                   aDispRes[ i ] := Str( aRes[ 1 ][ i ] )
-               ELSE
-                  aDispRes[ i ] := aRes[ 1 ][ i ]
+               ELSEIF HB_ISDATETIME( aRes[ 1 ][ i ] )
+                  aDispRes[ i ] := hb_TToC( aRes[ 1 ][ i ] )
                ENDIF
             NEXT
             @ 5, 5 CLEAR TO MaxRow() - 5, MaxCol() - 5
