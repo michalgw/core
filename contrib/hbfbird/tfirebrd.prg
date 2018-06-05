@@ -81,6 +81,11 @@ CREATE CLASS TFbServer
    METHOD ErrorNo()  INLINE ::nError
 
    METHOD   GetInfo( aInfos )
+   METHOD   BytesPerChar()
+
+   HIDDEN:
+
+   VAR nBytesPerChar INIT 0
 
 ENDCLASS
 
@@ -465,6 +470,28 @@ METHOD GetInfo( aInfos ) CLASS TFbServer
    ENDIF
 
    RETURN aRes
+
+METHOD BytesPerChar() CLASS TFbServer
+
+   LOCAL nRes := 1
+   LOCAL aInfo
+
+   IF ::nBytesPerChar == 0
+      aInfo := ::GetInfo( { FRB_INFO_ATT_CHARSET } )
+      IF HB_ISARRAY( aInfo ) .AND. Len( aInfo ) >= 2 ;
+         .AND. aInfo[ 1 ] == FRB_INFO_ATT_CHARSET .AND. HB_ISNUMERIC( aInfo[ 2 ] )
+
+         AEval( { { 3, 3 }, { 4, 4 }, { 5, 2 }, { 6, 2 }, { 44, 2 }, ;
+            { 56, 2 }, { 57, 2 }, { 67, 2 }, { 68, 2 }, { 69, 4 } }, ;
+            { | aVal | nRes := iif( aVal[ 1 ] == aInfo[ 2 ], aVal[ 2 ], nRes } )
+
+         ::nBytesPerChar := nRes
+      ENDIF
+   ELSE
+      nRes := ::nBytesPerChar
+   ENDIF
+
+   RETURN nRes
 
 CREATE CLASS TFbTransaction
 
@@ -1390,6 +1417,9 @@ CREATE CLASS TFbSQL
    METHOD FieldCount()
    METHOD FieldInfo( nIndex )
    METHOD FieldIndex( cFieldName )
+   METHOD FieldType( nIndex )
+   METHOD FieldLen( nIndex )
+   METHOD FieldDec( ncIndex )
    METHOD GetValue( xIndexOrName )
    METHOD GetRow( lAsHash )
 
@@ -1586,6 +1616,74 @@ METHOD FieldIndex( cFieldName ) CLASS TFbSQL
    NEXT
 
    RETURN nRes
+
+METHOD FieldType( nIndex ) CLASS TFbSQL
+
+   LOCAL cRes := "U"
+
+   DO SWITCH ::FieldInfo( nIndex )[ FBFS_TYPE ]
+   CASE SQL_TEXT
+   CASE SQL_VARYING
+      cRes := "C"
+      EXIT
+   CASE SQL_TIMESTAMP
+   CASE SQL_TYPE_TIME
+      cRes := "T"
+      EXIT
+   CASE SQL_TYPE_DATE
+      cRes := "D"
+      EXIT
+   CASE SQL_SHORT
+   CASE SQL_LONG
+   CASE SQL_FLOAT
+   CASE SQL_DOUBLE
+   CASE SQL_D_FLOAT
+   CASE SQL_INT64
+      cRes := "N"
+      EXIT
+   ENDSWITCH
+
+   RETURN cRes
+
+METHOD FieldLen( nIndex ) CLASS TFbSQL
+
+   LOCAL nRes := 0
+
+   DO SWITCH ::FieldInfo( nIndex )[ FBFS_TYPE ]
+   CASE SQL_TEXT
+   CASE SQL_VARYING
+      nRes := ::FieldInfo( nIndex )[ FBFS_LENGTH ] / ::oDatabase:BytesPerChar()
+      EXIT
+   CASE SQL_TIMESTAMP
+   CASE SQL_TYPE_TIME
+      nRes := Len( hb_TToC( hb_DateTime() ) )
+      EXIT
+   CASE SQL_TYPE_DATE
+      nRes := Len( hb_DToC( hb_Date() ) )
+      EXIT
+   CASE SQL_SHORT
+      nRes := 5
+      EXIT
+   CASE SQL_LONG
+      nRes := 10
+      EXIT
+   CASE SQL_FLOAT
+   CASE SQL_DOUBLE
+   CASE SQL_D_FLOAT
+      nRes := 15
+      EXIT
+   CASE SQL_INT64
+      nRes := 19
+      EXIT
+   OTHERWISE
+      nRes := ::FieldInfo( nIndex )[ FBFS_LENGTH ]
+   ENDSWITCH
+
+   RETURN
+
+METHOD FieldDec( ncIndex ) CLASS TFbSQL
+
+   RETURN ::FieldInfo( nIndex )[ FBFS_SCALE ]
 
 METHOD GetValue( xIndexOrName ) CLASS TFbSQL
 
@@ -1824,6 +1922,49 @@ METHOD Close() CLASS TFbBlobWriter
 
    RETURN .T.
 
+
+CREATE CLASS TFbGeneratorLink
+
+   VISIBLE:
+
+   VAR cGeneratorName
+   VAR xField
+   VAR nIncrement      INIT 1
+   VAR nWhereApply     INIT FBGW_ON_NEW_RECORD
+   VAR oDataSet
+
+   METHOD New( oDataSet ) CONSTRUCTOR
+   METHOD ValidLink()
+   METHOD Generate()
+
+ENDCLASS
+
+METHOD New( oDataSet ) CLASS TFbGeneratorLink
+
+   ::oDataSet := oDataSet
+
+   RETURN Self
+
+METHOD ValidLink() CLASS TFbGeneratorLink
+
+   RETURN HB_ISCHAR( ::cGeneratorName ) .AND. Len( ::cGeneratorName ) > 0 ;
+      .AND. ( ( HB_ISNUMERIC( ::xField ) .AND. ::xField > 0 ) ;
+      .OR. ( HB_ISCHAR( ::xField ) .AND. Len( ::xField ) > 0 ) ) ;
+      .AND. ( ::nWhereApply == FBGW_ON_NEW_RECORD .OR. ::nWhereApply == FBGW_ON_POST ) ;
+      .AND. HB_ISOBJECT( ::oDataSet )
+
+METHOD Generate() CLASS TFbGeneratorLink
+
+   LOCAL oSQL
+
+   oSQL := TFbSQL:New( ::oDataSet:Transaction, "select GEN_ID(" + AllTrim( ::cGeneratorName ) ;
+      + ", " + AllTrim( Str( ::nIncrement ) ) + ") from RDB$DATABASE" )
+
+   oSQL:Execute()
+   oSQL:Fetch()
+
+   RETURN oSQL:GetValue( 1 )
+
 CREATE CLASS TFbDataSet
 
    HIDDEN:
@@ -1853,6 +1994,8 @@ CREATE CLASS TFbDataSet
    VAR   lEditRowChanged INIT .F.
 
    VAR   lSQLEof      INIT .T.
+
+   VAR   oGeneratorLink
 
    METHOD InitSQL()
    METHOD FetchRecord()
@@ -1891,6 +2034,9 @@ CREATE CLASS TFbDataSet
    METHOD GetValue( ncIndex )
    METHOD SetValue( ncIndex, xValue, lIsRefresh )
    METHOD DefaulValue( ncIndex )
+   METHOD FieldType( ncIndex )
+   METHOD FieldLen( ncIndex )
+   METHOD FieldDec( ncIndex )
 
    METHOD Locate( aFlds, aValues, lContinue, lCaseSensitive, lPartial )
 
@@ -1921,7 +2067,14 @@ CREATE CLASS TFbDataSet
    ACCESS DeleteObj INLINE ( ::oDeleteSQL )
    ACCESS RefreshObj INLINE ( ::oRefreshSQL )
 
+   ACCESS CanInsert INLINE ( ::lCanInsert )
+   ACCESS CanUpdate INLINE ( ::lCanUpdate )
+   ACCESS CanDelete INLINE ( ::lCanDelete )
+   ACCESS CanRefresh INLINE ( ::lCanRefresh )
+
    ACCESS RecordCount INLINE ( ( Len( ::aRows ) + iif( ::nState == FBDS_APPEND, 1, 0 ) ) )
+
+   ACCESS GeneratorLink INLINE ( ::oGeneratorLink )
 
    VAR    UseDefaultValue   INIT .F.
 
@@ -2032,6 +2185,8 @@ METHOD New( oDatabase, oTransaction, cSelectSQL, aInsertSQL, aUpdateSQL, aDelete
    ::aRefreshSQL := aRefreshSQL
    ::oRefreshSQL := TFBSQL():New( oDatabase, oTransaction )
 
+   ::oGeneratorLink := TFbGeneratorLink():New( Self )
+
    RETURN Self
 
 DESTRUCTOR Free() CLASS TFbDataSet
@@ -2042,6 +2197,7 @@ DESTRUCTOR Free() CLASS TFbDataSet
    ::oInsertSQL := NIL
    ::oUpdateSQL := NIL
    ::oSelectSQL := NIL
+   ::oGeneratorLink := NIL
 
    RETURN
 
@@ -2226,6 +2382,10 @@ METHOD Append() CLASS TFbDataSet
       ::nCurRow := ::RecordCount
       ::lEditRowChanged := .F.
 
+      IF ::oGeneratorLink:ValidLink() .AND. ::oGeneratorLink:nWhereApply == FBGW_ON_NEW_RECORD
+         ::SetValue( ::oGeneratorLink:xField, ::oGeneratorLink:Generate() )
+      ENDIF
+
       lRes := .T.
    ENDIF
 
@@ -2247,6 +2407,11 @@ METHOD Post() CLASS TFbDataSet
          EXIT
       CASE FBDS_APPEND
          IF ::lCanInsert
+
+            IF ::oGeneratorLink:ValidLink() .AND. ::oGeneratorLink:nWhereApply == FBGW_ON_POST
+               ::SetValue( ::oGeneratorLink:xField, ::oGeneratorLink:Generate() )
+            ENDIF
+
             lRes := ::UpdateParams( ::oInsertSQL, ::aInsertSQL[ 2 ] ) .AND. ::oInsertSQL:Execute()
 
             // RETURNING values
@@ -2308,12 +2473,12 @@ METHOD Refresh() CLASS TFbDataSet
    LOCAL lRes := .F.
    LOCAL nI
 
-   IF ::Active .AND. ::State == FBDS_BROWSE .AND. ::RecordCount > 0 .AND. ::nCurRow > 0 .AND. ::lCanRefres
+   IF ::Active .AND. ::State == FBDS_BROWSE .AND. ::RecordCount > 0 .AND. ::nCurRow > 0 .AND. ::lCanRefresh
 
       ::UpdateParams( ::oRefresSQL, ::aRefreshSQL[ 2 ] )
 
       IF ( lRes := ::oRefreshSQL:Execute() )
-         IF ::oRefreshSQL:Fetch() == 0
+         IF ( lRes := ::oRefreshSQL:Fetch() == 0 )
             FOR nI := 1 TO ::oRefreshSQL:FieldCount()
                ::SetValue( ::oRefreshSQL:FieldInfo[ nI ][ 1 ], ::oRefreshSQL:GetData[ nI ], .T. )
             NEXT
@@ -2342,6 +2507,18 @@ METHOD FieldCount() CLASS TFbDataSet
 METHOD FieldInfo( ncIndex ) CLASS TFbDataSet
 
    RETURN ::oSelectSQL:FieldInfo( ncIndex )
+
+METHOD FieldType( ncIndex ) CLASS TFbDataSet
+
+   RETURN ::oSelectSQL:FieldType( ncIndex )
+
+METHOD FieldLen( ncIndex ) CLASS TFbDataSet
+
+   RETURN ::oSelectSQL:FieldLen( ncIndex )
+
+METHOD FieldDec( ncIndex ) CLASS TFbDataSet
+
+   RETURN ::oSelectSQL:FieldDec( ncIndex )
 
 METHOD GetValue( ncIndex ) CLASS TFbDataSet
 

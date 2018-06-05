@@ -134,207 +134,207 @@
 #define SQL_NULL                         32766
 #define SQL_DATE                           SQL_TIMESTAMP
 
-#define ISC_SPB_VERSION1                  1                                              
-#define ISC_SPB_CURRENT_VERSION           2                                              
-#define ISC_SPB_VERSION                   ISC_SPB_CURRENT_VERSION                        
-#define ISC_SPB_USER_NAME                 ISC_DPB_USER_NAME                              
-#define ISC_SPB_SYS_USER_NAME             ISC_DPB_SYS_USER_NAME                          
-#define ISC_SPB_SYS_USER_NAME_ENC         ISC_DPB_SYS_USER_NAME_ENC                      
-#define ISC_SPB_PASSWORD                  ISC_DPB_PASSWORD                               
-#define ISC_SPB_PASSWORD_ENC              ISC_DPB_PASSWORD_ENC                           
-#define ISC_SPB_COMMAND_LINE              105                                            
-#define ISC_SPB_DBNAME                    106                                            
-#define ISC_SPB_VERBOSE                   107                                            
-#define ISC_SPB_OPTIONS                   108                                            
-#define ISC_SPB_ADDRESS_PATH              109                                            
-#define ISC_SPB_PROCESS_ID                110                                            
-#define ISC_SPB_TRUSTED_AUTH                      111                                    
-#define ISC_SPB_PROCESS_NAME              112                                            
-#define ISC_SPB_TRUSTED_ROLE              113                                            
-                                                                                         
-#define ISC_SPB_CONNECT_TIMEOUT           ISC_DPB_CONNECT_TIMEOUT                        
-#define ISC_SPB_DUMMY_PACKET_INTERVAL     ISC_DPB_DUMMY_PACKET_INTERVAL                  
-#define ISC_SPB_SQL_ROLE_NAME             ISC_DPB_SQL_ROLE_NAME                          
-                                                                                         
-#define ISC_ACTION_SVC_BACKUP          1                                                 
-#define ISC_ACTION_SVC_RESTORE         2                                                 
-#define ISC_ACTION_SVC_REPAIR          3                                                 
-#define ISC_ACTION_SVC_ADD_USER        4                                                 
-#define ISC_ACTION_SVC_DELETE_USER     5                                                 
-#define ISC_ACTION_SVC_MODIFY_USER     6                                                 
-#define ISC_ACTION_SVC_DISPLAY_USER    7                                                 
-#define ISC_ACTION_SVC_PROPERTIES      8                                                 
-#define ISC_ACTION_SVC_ADD_LICENSE     9                                                 
-#define ISC_ACTION_SVC_REMOVE_LICENSE 10                                                 
-#define ISC_ACTION_SVC_DB_STATS       11                                                 
-#define ISC_ACTION_SVC_GET_IB_LOG     12                                                 
-#define ISC_ACTION_SVC_GET_FB_LOG     12                                                 
-#define ISC_ACTION_SVC_NBAK           20                                                 
-#define ISC_ACTION_SVC_NREST          21                                                 
-#define ISC_ACTION_SVC_TRACE_START    22                                                 
-#define ISC_ACTION_SVC_TRACE_STOP     23                                                 
-#define ISC_ACTION_SVC_TRACE_SUSPEND  24                                                 
-#define ISC_ACTION_SVC_TRACE_RESUME   25                                                 
-#define ISC_ACTION_SVC_TRACE_LIST     26                                                 
-#define ISC_ACTION_SVC_SET_MAPPING    27                                                 
-#define ISC_ACTION_SVC_DROP_MAPPING   28                                                 
-#define ISC_ACTION_SVC_DISPLAY_USER_ADM 29                                               
-#define ISC_ACTION_SVC_VALIDATE           30                                             
-#define ISC_ACTION_SVC_LAST                       31                                     
-                                                                                         
-#define ISC_INFO_SVC_SVR_DB_INFO      50                                                 
-#define ISC_INFO_SVC_GET_LICENSE      51                                                 
-#define ISC_INFO_SVC_GET_LICENSE_MASK 52                                                 
-#define ISC_INFO_SVC_GET_CONFIG       53                                                 
-#define ISC_INFO_SVC_VERSION          54                                                 
-#define ISC_INFO_SVC_SERVER_VERSION   55                                                 
-#define ISC_INFO_SVC_IMPLEMENTATION   56                                                 
-#define ISC_INFO_SVC_CAPABILITIES     57                                                 
-#define ISC_INFO_SVC_USER_DBPATH      58                                                 
-#define ISC_INFO_SVC_GET_ENV          59                                                 
-#define ISC_INFO_SVC_GET_ENV_LOCK     60                                                 
-#define ISC_INFO_SVC_GET_ENV_MSG      61                                                 
-#define ISC_INFO_SVC_LINE             62                                                 
-#define ISC_INFO_SVC_TO_EOF           63                                                 
-#define ISC_INFO_SVC_TIMEOUT          64                                                 
-#define ISC_INFO_SVC_GET_LICENSED_USERS 65                                               
-#define ISC_INFO_SVC_LIMBO_TRANS        66                                               
-#define ISC_INFO_SVC_RUNNING            67                                               
-#define ISC_INFO_SVC_GET_USERS          68                                               
-#define ISC_INFO_SVC_STDIN                      78                                       
-                                                                                         
-#define ISC_SPB_SEC_USERID            5                                                  
-#define ISC_SPB_SEC_GROUPID           6                                                  
-#define ISC_SPB_SEC_USERNAME          7                                                  
-#define ISC_SPB_SEC_PASSWORD          8                                                  
-#define ISC_SPB_SEC_GROUPNAME         9                                                  
-#define ISC_SPB_SEC_FIRSTNAME         10                                                 
-#define ISC_SPB_SEC_MIDDLENAME        11                                                 
-#define ISC_SPB_SEC_LASTNAME          12                                                 
-#define ISC_SPB_SEC_ADMIN             13                                                 
-                                                                                         
-#define ISC_SPB_LIC_KEY               5                                                  
-#define ISC_SPB_LIC_ID                6                                                  
-#define ISC_SPB_LIC_DESC              7                                                  
-                                                                                         
-#define ISC_SPB_BKP_FILE                 5                                               
-#define ISC_SPB_BKP_FACTOR               6                                               
-#define ISC_SPB_BKP_LENGTH               7                                               
-#define ISC_SPB_BKP_STAT                 15                                              
-#define ISC_SPB_BKP_IGNORE_CHECKSUMS     0x01                                            
-#define ISC_SPB_BKP_IGNORE_LIMBO         0x02                                            
-#define ISC_SPB_BKP_METADATA_ONLY        0x04                                            
-#define ISC_SPB_BKP_NO_GARBAGE_COLLECT   0x08                                            
-#define ISC_SPB_BKP_OLD_DESCRIPTIONS     0x10                                            
-#define ISC_SPB_BKP_NON_TRANSPORTABLE    0x20                                            
-#define ISC_SPB_BKP_CONVERT              0x40                                            
-#define ISC_SPB_BKP_EXPAND                               0x80                            
-#define ISC_SPB_BKP_NO_TRIGGERS                  0x8000                                  
-                                                                                         
-#define ISC_SPB_PRP_PAGE_BUFFERS                5                                        
-#define ISC_SPB_PRP_SWEEP_INTERVAL              6                                        
-#define ISC_SPB_PRP_SHUTDOWN_DB                 7                                        
-#define ISC_SPB_PRP_DENY_NEW_ATTACHMENTS        9                                        
-#define ISC_SPB_PRP_DENY_NEW_TRANSACTIONS       10                                       
-#define ISC_SPB_PRP_RESERVE_SPACE               11                                       
-#define ISC_SPB_PRP_WRITE_MODE                  12                                       
-#define ISC_SPB_PRP_ACCESS_MODE                 13                                       
-#define ISC_SPB_PRP_SET_SQL_DIALECT             14                                       
-#define ISC_SPB_PRP_ACTIVATE                    0x0100                                   
-#define ISC_SPB_PRP_DB_ONLINE                   0x0200                                   
-#define ISC_SPB_PRP_FORCE_SHUTDOWN                      41                               
-#define ISC_SPB_PRP_ATTACHMENTS_SHUTDOWN        42                                       
-#define ISC_SPB_PRP_TRANSACTIONS_SHUTDOWN       43                                       
-#define ISC_SPB_PRP_SHUTDOWN_MODE               44                                       
-#define ISC_SPB_PRP_ONLINE_MODE                 45                                       
-                                                                                         
-#define ISC_SPB_PRP_SM_NORMAL           0                                                
-#define ISC_SPB_PRP_SM_MULTI            1                                                
-#define ISC_SPB_PRP_SM_SINGLE           2                                                
-#define ISC_SPB_PRP_SM_FULL                     3                                        
-                                                                                         
-#define ISC_SPB_PRP_RES_USE_FULL        35                                               
-#define ISC_SPB_PRP_RES                         36                                       
-                                                                                         
-#define ISC_SPB_PRP_WM_ASYNC            37                                               
-#define ISC_SPB_PRP_WM_SYNC                     38                                       
-                                                                                         
-#define ISC_SPB_PRP_AM_READONLY         39                                               
-#define ISC_SPB_PRP_AM_READWRITE        40                                               
-                                                                                         
-#define ISC_SPB_RPR_COMMIT_TRANS                15                                       
-#define ISC_SPB_RPR_ROLLBACK_TRANS              34                                       
-#define ISC_SPB_RPR_RECOVER_TWO_PHASE   17                                               
-#define ISC_SPB_TRA_ID                                  18                               
-#define ISC_SPB_SINGLE_TRA_ID                   19                                       
-#define ISC_SPB_MULTI_TRA_ID                    20                                       
-#define ISC_SPB_TRA_STATE                               21                               
-#define ISC_SPB_TRA_STATE_LIMBO                 22                                       
-#define ISC_SPB_TRA_STATE_COMMIT                23                                       
-#define ISC_SPB_TRA_STATE_ROLLBACK              24                                       
-#define ISC_SPB_TRA_STATE_UNKNOWN               25                                       
-#define ISC_SPB_TRA_HOST_SITE                   26                                       
-#define ISC_SPB_TRA_REMOTE_SITE                 27                                       
-#define ISC_SPB_TRA_DB_PATH                             28                               
-#define ISC_SPB_TRA_ADVISE                              29                               
-#define ISC_SPB_TRA_ADVISE_COMMIT               30                                       
-#define ISC_SPB_TRA_ADVISE_ROLLBACK             31                                       
-#define ISC_SPB_TRA_ADVISE_UNKNOWN              33                                       
-                                                                                         
-#define ISC_SPB_RPR_VALIDATE_DB                 0x01                                     
-#define ISC_SPB_RPR_SWEEP_DB                    0x02                                     
-#define ISC_SPB_RPR_MEND_DB                             0x04                             
-#define ISC_SPB_RPR_LIST_LIMBO_TRANS    0x08                                             
-#define ISC_SPB_RPR_CHECK_DB                    0x10                                     
-#define ISC_SPB_RPR_IGNORE_CHECKSUM             0x20                                     
-#define ISC_SPB_RPR_KILL_SHADOWS                0x40                                     
-#define ISC_SPB_RPR_FULL                                0x80                             
-                                                                                         
-#define ISC_SPB_RES_BUFFERS                             9                                
-#define ISC_SPB_RES_PAGE_SIZE                   10                                       
-#define ISC_SPB_RES_LENGTH                              11                               
-#define ISC_SPB_RES_ACCESS_MODE                 12                                       
-#define ISC_SPB_RES_FIX_FSS_DATA                13                                       
-#define ISC_SPB_RES_FIX_FSS_METADATA    14                                               
-#define ISC_SPB_RES_STAT                                ISC_SPB_BKP_STAT                 
-#define ISC_SPB_RES_METADATA_ONLY               ISC_SPB_BKP_METADATA_ONLY                
-#define ISC_SPB_RES_DEACTIVATE_IDX              0x0100                                   
-#define ISC_SPB_RES_NO_SHADOW                   0x0200                                   
-#define ISC_SPB_RES_NO_VALIDITY                 0x0400                                   
-#define ISC_SPB_RES_ONE_AT_A_TIME               0x0800                                   
-#define ISC_SPB_RES_REPLACE                             0x1000                           
-#define ISC_SPB_RES_CREATE                              0x2000                           
-#define ISC_SPB_RES_USE_ALL_SPACE               0x4000                                   
-                                                                                         
-#define ISC_SPB_VAL_TAB_INCL            1                                                
-#define ISC_SPB_VAL_TAB_EXCL            2                                                
-#define ISC_SPB_VAL_IDX_INCL            3                                                
-#define ISC_SPB_VAL_IDX_EXCL            4                                                
-#define ISC_SPB_VAL_LOCK_TIMEOUT        5                                                
-                                                                                         
-#define ISC_SPB_RES_AM_READONLY                 ISC_SPB_PRP_AM_READONLY                  
-#define ISC_SPB_RES_AM_READWRITE                ISC_SPB_PRP_AM_READWRITE                 
-                                                                                         
-#define ISC_SPB_NUM_ATT                 5                                                
-#define ISC_SPB_NUM_DB                  6                                                
-                                                                                         
-#define ISC_SPB_STS_DATA_PAGES          0x01                                             
-#define ISC_SPB_STS_DB_LOG                      0x02                                     
-#define ISC_SPB_STS_HDR_PAGES           0x04                                             
-#define ISC_SPB_STS_IDX_PAGES           0x08                                             
-#define ISC_SPB_STS_SYS_RELATIONS       0x10                                             
-#define ISC_SPB_STS_RECORD_VERSIONS     0x20                                             
-#define ISC_SPB_STS_TABLE                       0x40                                     
-#define ISC_SPB_STS_NOCREATION          0x80                                             
-                                                                                         
-#define ISC_SPB_NBK_LEVEL                       5                                        
-#define ISC_SPB_NBK_FILE                        6                                        
-#define ISC_SPB_NBK_DIRECT                      7                                        
-#define ISC_SPB_NBK_NO_TRIGGERS         0x01                                             
-                                                                                         
-#define ISC_SPB_TRC_ID                          1                                        
-#define ISC_SPB_TRC_NAME                        2                                        
-#define ISC_SPB_TRC_CFG                         3                                        
+#define ISC_SPB_VERSION1                  1
+#define ISC_SPB_CURRENT_VERSION           2
+#define ISC_SPB_VERSION                   ISC_SPB_CURRENT_VERSION
+#define ISC_SPB_USER_NAME                 ISC_DPB_USER_NAME
+#define ISC_SPB_SYS_USER_NAME             ISC_DPB_SYS_USER_NAME
+#define ISC_SPB_SYS_USER_NAME_ENC         ISC_DPB_SYS_USER_NAME_ENC
+#define ISC_SPB_PASSWORD                  ISC_DPB_PASSWORD
+#define ISC_SPB_PASSWORD_ENC              ISC_DPB_PASSWORD_ENC
+#define ISC_SPB_COMMAND_LINE              105
+#define ISC_SPB_DBNAME                    106
+#define ISC_SPB_VERBOSE                   107
+#define ISC_SPB_OPTIONS                   108
+#define ISC_SPB_ADDRESS_PATH              109
+#define ISC_SPB_PROCESS_ID                110
+#define ISC_SPB_TRUSTED_AUTH                      111
+#define ISC_SPB_PROCESS_NAME              112
+#define ISC_SPB_TRUSTED_ROLE              113
+
+#define ISC_SPB_CONNECT_TIMEOUT           ISC_DPB_CONNECT_TIMEOUT
+#define ISC_SPB_DUMMY_PACKET_INTERVAL     ISC_DPB_DUMMY_PACKET_INTERVAL
+#define ISC_SPB_SQL_ROLE_NAME             ISC_DPB_SQL_ROLE_NAME
+
+#define ISC_ACTION_SVC_BACKUP          1
+#define ISC_ACTION_SVC_RESTORE         2
+#define ISC_ACTION_SVC_REPAIR          3
+#define ISC_ACTION_SVC_ADD_USER        4
+#define ISC_ACTION_SVC_DELETE_USER     5
+#define ISC_ACTION_SVC_MODIFY_USER     6
+#define ISC_ACTION_SVC_DISPLAY_USER    7
+#define ISC_ACTION_SVC_PROPERTIES      8
+#define ISC_ACTION_SVC_ADD_LICENSE     9
+#define ISC_ACTION_SVC_REMOVE_LICENSE 10
+#define ISC_ACTION_SVC_DB_STATS       11
+#define ISC_ACTION_SVC_GET_IB_LOG     12
+#define ISC_ACTION_SVC_GET_FB_LOG     12
+#define ISC_ACTION_SVC_NBAK           20
+#define ISC_ACTION_SVC_NREST          21
+#define ISC_ACTION_SVC_TRACE_START    22
+#define ISC_ACTION_SVC_TRACE_STOP     23
+#define ISC_ACTION_SVC_TRACE_SUSPEND  24
+#define ISC_ACTION_SVC_TRACE_RESUME   25
+#define ISC_ACTION_SVC_TRACE_LIST     26
+#define ISC_ACTION_SVC_SET_MAPPING    27
+#define ISC_ACTION_SVC_DROP_MAPPING   28
+#define ISC_ACTION_SVC_DISPLAY_USER_ADM 29
+#define ISC_ACTION_SVC_VALIDATE           30
+#define ISC_ACTION_SVC_LAST                       31
+
+#define ISC_INFO_SVC_SVR_DB_INFO      50
+#define ISC_INFO_SVC_GET_LICENSE      51
+#define ISC_INFO_SVC_GET_LICENSE_MASK 52
+#define ISC_INFO_SVC_GET_CONFIG       53
+#define ISC_INFO_SVC_VERSION          54
+#define ISC_INFO_SVC_SERVER_VERSION   55
+#define ISC_INFO_SVC_IMPLEMENTATION   56
+#define ISC_INFO_SVC_CAPABILITIES     57
+#define ISC_INFO_SVC_USER_DBPATH      58
+#define ISC_INFO_SVC_GET_ENV          59
+#define ISC_INFO_SVC_GET_ENV_LOCK     60
+#define ISC_INFO_SVC_GET_ENV_MSG      61
+#define ISC_INFO_SVC_LINE             62
+#define ISC_INFO_SVC_TO_EOF           63
+#define ISC_INFO_SVC_TIMEOUT          64
+#define ISC_INFO_SVC_GET_LICENSED_USERS 65
+#define ISC_INFO_SVC_LIMBO_TRANS        66
+#define ISC_INFO_SVC_RUNNING            67
+#define ISC_INFO_SVC_GET_USERS          68
+#define ISC_INFO_SVC_STDIN                      78
+
+#define ISC_SPB_SEC_USERID            5
+#define ISC_SPB_SEC_GROUPID           6
+#define ISC_SPB_SEC_USERNAME          7
+#define ISC_SPB_SEC_PASSWORD          8
+#define ISC_SPB_SEC_GROUPNAME         9
+#define ISC_SPB_SEC_FIRSTNAME         10
+#define ISC_SPB_SEC_MIDDLENAME        11
+#define ISC_SPB_SEC_LASTNAME          12
+#define ISC_SPB_SEC_ADMIN             13
+
+#define ISC_SPB_LIC_KEY               5
+#define ISC_SPB_LIC_ID                6
+#define ISC_SPB_LIC_DESC              7
+
+#define ISC_SPB_BKP_FILE                 5
+#define ISC_SPB_BKP_FACTOR               6
+#define ISC_SPB_BKP_LENGTH               7
+#define ISC_SPB_BKP_STAT                 15
+#define ISC_SPB_BKP_IGNORE_CHECKSUMS     0x01
+#define ISC_SPB_BKP_IGNORE_LIMBO         0x02
+#define ISC_SPB_BKP_METADATA_ONLY        0x04
+#define ISC_SPB_BKP_NO_GARBAGE_COLLECT   0x08
+#define ISC_SPB_BKP_OLD_DESCRIPTIONS     0x10
+#define ISC_SPB_BKP_NON_TRANSPORTABLE    0x20
+#define ISC_SPB_BKP_CONVERT              0x40
+#define ISC_SPB_BKP_EXPAND                               0x80
+#define ISC_SPB_BKP_NO_TRIGGERS                  0x8000
+
+#define ISC_SPB_PRP_PAGE_BUFFERS                5
+#define ISC_SPB_PRP_SWEEP_INTERVAL              6
+#define ISC_SPB_PRP_SHUTDOWN_DB                 7
+#define ISC_SPB_PRP_DENY_NEW_ATTACHMENTS        9
+#define ISC_SPB_PRP_DENY_NEW_TRANSACTIONS       10
+#define ISC_SPB_PRP_RESERVE_SPACE               11
+#define ISC_SPB_PRP_WRITE_MODE                  12
+#define ISC_SPB_PRP_ACCESS_MODE                 13
+#define ISC_SPB_PRP_SET_SQL_DIALECT             14
+#define ISC_SPB_PRP_ACTIVATE                    0x0100
+#define ISC_SPB_PRP_DB_ONLINE                   0x0200
+#define ISC_SPB_PRP_FORCE_SHUTDOWN                      41
+#define ISC_SPB_PRP_ATTACHMENTS_SHUTDOWN        42
+#define ISC_SPB_PRP_TRANSACTIONS_SHUTDOWN       43
+#define ISC_SPB_PRP_SHUTDOWN_MODE               44
+#define ISC_SPB_PRP_ONLINE_MODE                 45
+
+#define ISC_SPB_PRP_SM_NORMAL           0
+#define ISC_SPB_PRP_SM_MULTI            1
+#define ISC_SPB_PRP_SM_SINGLE           2
+#define ISC_SPB_PRP_SM_FULL                     3
+
+#define ISC_SPB_PRP_RES_USE_FULL        35
+#define ISC_SPB_PRP_RES                         36
+
+#define ISC_SPB_PRP_WM_ASYNC            37
+#define ISC_SPB_PRP_WM_SYNC                     38
+
+#define ISC_SPB_PRP_AM_READONLY         39
+#define ISC_SPB_PRP_AM_READWRITE        40
+
+#define ISC_SPB_RPR_COMMIT_TRANS                15
+#define ISC_SPB_RPR_ROLLBACK_TRANS              34
+#define ISC_SPB_RPR_RECOVER_TWO_PHASE   17
+#define ISC_SPB_TRA_ID                                  18
+#define ISC_SPB_SINGLE_TRA_ID                   19
+#define ISC_SPB_MULTI_TRA_ID                    20
+#define ISC_SPB_TRA_STATE                               21
+#define ISC_SPB_TRA_STATE_LIMBO                 22
+#define ISC_SPB_TRA_STATE_COMMIT                23
+#define ISC_SPB_TRA_STATE_ROLLBACK              24
+#define ISC_SPB_TRA_STATE_UNKNOWN               25
+#define ISC_SPB_TRA_HOST_SITE                   26
+#define ISC_SPB_TRA_REMOTE_SITE                 27
+#define ISC_SPB_TRA_DB_PATH                             28
+#define ISC_SPB_TRA_ADVISE                              29
+#define ISC_SPB_TRA_ADVISE_COMMIT               30
+#define ISC_SPB_TRA_ADVISE_ROLLBACK             31
+#define ISC_SPB_TRA_ADVISE_UNKNOWN              33
+
+#define ISC_SPB_RPR_VALIDATE_DB                 0x01
+#define ISC_SPB_RPR_SWEEP_DB                    0x02
+#define ISC_SPB_RPR_MEND_DB                             0x04
+#define ISC_SPB_RPR_LIST_LIMBO_TRANS    0x08
+#define ISC_SPB_RPR_CHECK_DB                    0x10
+#define ISC_SPB_RPR_IGNORE_CHECKSUM             0x20
+#define ISC_SPB_RPR_KILL_SHADOWS                0x40
+#define ISC_SPB_RPR_FULL                                0x80
+
+#define ISC_SPB_RES_BUFFERS                             9
+#define ISC_SPB_RES_PAGE_SIZE                   10
+#define ISC_SPB_RES_LENGTH                              11
+#define ISC_SPB_RES_ACCESS_MODE                 12
+#define ISC_SPB_RES_FIX_FSS_DATA                13
+#define ISC_SPB_RES_FIX_FSS_METADATA    14
+#define ISC_SPB_RES_STAT                                ISC_SPB_BKP_STAT
+#define ISC_SPB_RES_METADATA_ONLY               ISC_SPB_BKP_METADATA_ONLY
+#define ISC_SPB_RES_DEACTIVATE_IDX              0x0100
+#define ISC_SPB_RES_NO_SHADOW                   0x0200
+#define ISC_SPB_RES_NO_VALIDITY                 0x0400
+#define ISC_SPB_RES_ONE_AT_A_TIME               0x0800
+#define ISC_SPB_RES_REPLACE                             0x1000
+#define ISC_SPB_RES_CREATE                              0x2000
+#define ISC_SPB_RES_USE_ALL_SPACE               0x4000
+
+#define ISC_SPB_VAL_TAB_INCL            1
+#define ISC_SPB_VAL_TAB_EXCL            2
+#define ISC_SPB_VAL_IDX_INCL            3
+#define ISC_SPB_VAL_IDX_EXCL            4
+#define ISC_SPB_VAL_LOCK_TIMEOUT        5
+
+#define ISC_SPB_RES_AM_READONLY                 ISC_SPB_PRP_AM_READONLY
+#define ISC_SPB_RES_AM_READWRITE                ISC_SPB_PRP_AM_READWRITE
+
+#define ISC_SPB_NUM_ATT                 5
+#define ISC_SPB_NUM_DB                  6
+
+#define ISC_SPB_STS_DATA_PAGES          0x01
+#define ISC_SPB_STS_DB_LOG                      0x02
+#define ISC_SPB_STS_HDR_PAGES           0x04
+#define ISC_SPB_STS_IDX_PAGES           0x08
+#define ISC_SPB_STS_SYS_RELATIONS       0x10
+#define ISC_SPB_STS_RECORD_VERSIONS     0x20
+#define ISC_SPB_STS_TABLE                       0x40
+#define ISC_SPB_STS_NOCREATION          0x80
+
+#define ISC_SPB_NBK_LEVEL                       5
+#define ISC_SPB_NBK_FILE                        6
+#define ISC_SPB_NBK_DIRECT                      7
+#define ISC_SPB_NBK_NO_TRIGGERS         0x01
+
+#define ISC_SPB_TRC_ID                          1
+#define ISC_SPB_TRC_NAME                        2
+#define ISC_SPB_TRC_CFG                         3
 
 #define ISC_INFO_END                    1
 #define ISC_INFO_TRUNCATED              2
@@ -438,3 +438,8 @@
 #define FBFS_RELNAME                      5
 #define FBFS_ALIASNAME_LEN                6
 #define FBFS_ALIASNAME                    7
+
+/* generator - when apply  */
+#define FBGW_ON_NEW_RECORD                1
+#define FBGW_ON_POST                      2
+#define FBGW_ON_SERVER                    3
