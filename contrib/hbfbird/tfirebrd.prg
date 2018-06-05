@@ -483,7 +483,7 @@ METHOD BytesPerChar() CLASS TFbServer
 
          AEval( { { 3, 3 }, { 4, 4 }, { 5, 2 }, { 6, 2 }, { 44, 2 }, ;
             { 56, 2 }, { 57, 2 }, { 67, 2 }, { 68, 2 }, { 69, 4 } }, ;
-            { | aVal | nRes := iif( aVal[ 1 ] == aInfo[ 2 ], aVal[ 2 ], nRes } )
+            { | aVal | nRes := iif( aVal[ 1 ] == aInfo[ 2 ], aVal[ 2 ], nRes ) } )
 
          ::nBytesPerChar := nRes
       ENDIF
@@ -1621,7 +1621,7 @@ METHOD FieldType( nIndex ) CLASS TFbSQL
 
    LOCAL cRes := "U"
 
-   DO SWITCH ::FieldInfo( nIndex )[ FBFS_TYPE ]
+   SWITCH ::FieldInfo( nIndex )[ FBFS_TYPE ]
    CASE SQL_TEXT
    CASE SQL_VARYING
       cRes := "C"
@@ -1649,7 +1649,7 @@ METHOD FieldLen( nIndex ) CLASS TFbSQL
 
    LOCAL nRes := 0
 
-   DO SWITCH ::FieldInfo( nIndex )[ FBFS_TYPE ]
+   SWITCH ::FieldInfo( nIndex )[ FBFS_TYPE ]
    CASE SQL_TEXT
    CASE SQL_VARYING
       nRes := ::FieldInfo( nIndex )[ FBFS_LENGTH ] / ::oDatabase:BytesPerChar()
@@ -1679,11 +1679,11 @@ METHOD FieldLen( nIndex ) CLASS TFbSQL
       nRes := ::FieldInfo( nIndex )[ FBFS_LENGTH ]
    ENDSWITCH
 
-   RETURN
+   RETURN nRes
 
 METHOD FieldDec( ncIndex ) CLASS TFbSQL
 
-   RETURN ::FieldInfo( nIndex )[ FBFS_SCALE ]
+   RETURN ::FieldInfo( ncIndex )[ FBFS_SCALE ]
 
 METHOD GetValue( xIndexOrName ) CLASS TFbSQL
 
@@ -1957,7 +1957,7 @@ METHOD Generate() CLASS TFbGeneratorLink
 
    LOCAL oSQL
 
-   oSQL := TFbSQL:New( ::oDataSet:Transaction, "select GEN_ID(" + AllTrim( ::cGeneratorName ) ;
+   oSQL := TFbSQL():New( ::oDataSet:Transaction, "select GEN_ID(" + AllTrim( ::cGeneratorName ) ;
       + ", " + AllTrim( Str( ::nIncrement ) ) + ") from RDB$DATABASE" )
 
    oSQL:Execute()
