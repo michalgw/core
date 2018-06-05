@@ -209,6 +209,7 @@ void hb_compPrintCredits( HB_COMP_DECL )
          "Jose Lalin (dezac corevia.com)\n"
          "Klas Engwall (harbour engwall.com)\n"
          "Kwon, Oh-Chul (ohchul fivetech.net)\n"
+         "Lailton Fernando Mariano (lailton harbour.com.br)\n"
          "Leslee Griffith (les.griffith vantagesystems.ca)\n"
          "Lorenzo Fiorini (lorenzo.fiorini gmail com)\n"
          "Luis Krause Mantilla (lkrausem shaw.ca)\n"
@@ -260,8 +261,8 @@ void hb_compPrintLogo( HB_COMP_DECL )
 {
    char * szVer = hb_verHarbour();
 
-   #define HB_VER_COMMIT_YEAR  "2016"
-   #define HB_VER_ORIGIN_URL   "http://harbour-project.org/"
+   #define HB_VER_COMMIT_YEAR  "2018"
+   #define HB_VER_ORIGIN_URL   "https://harbour.github.io/"
 
    hb_compOutStd( HB_COMP_PARAM, szVer );
    hb_compOutStd( HB_COMP_PARAM,

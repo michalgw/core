@@ -798,6 +798,7 @@ extern HB_EXPORT HB_BOOL      hb_arrayNew( PHB_ITEM pItem, HB_SIZE nLen ); /* cr
 extern HB_EXPORT HB_SIZE      hb_arrayLen( PHB_ITEM pArray ); /* retrieves the array length */
 extern HB_EXPORT HB_BOOL      hb_arrayIsObject( PHB_ITEM pArray ); /* retrieves if the array is an object */
 extern HB_EXPORT void *       hb_arrayId( PHB_ITEM pArray ); /* retrieves the array unique ID */
+extern HB_EXPORT HB_COUNTER   hb_arrayRefs( PHB_ITEM pArray ); /* retrieves numer of references to the array */
 extern HB_EXPORT PHB_ITEM     hb_arrayFromId( PHB_ITEM pItem, void * pArrayId );
 extern HB_EXPORT HB_BOOL      hb_arrayAdd( PHB_ITEM pArray, PHB_ITEM pItemValue ); /* add a new item to the end of an array item */
 extern HB_EXPORT HB_BOOL      hb_arrayAddForward( PHB_ITEM pArray, PHB_ITEM pValue ); /* add a new item to the end of an array item with no incrementing of reference counters */
@@ -877,39 +878,40 @@ extern void hb_hashCloneBody( PHB_ITEM pDest, PHB_ITEM pHash, PHB_NESTED_CLONED 
 
 
 /* hash management */
-extern HB_EXPORT PHB_ITEM  hb_hashNew( PHB_ITEM pItem );
-extern HB_EXPORT HB_SIZE   hb_hashLen( PHB_ITEM pHash );
-extern HB_EXPORT HB_BOOL   hb_hashDel( PHB_ITEM pHash, PHB_ITEM pKey );
-extern HB_EXPORT HB_BOOL   hb_hashAdd( PHB_ITEM pHash, PHB_ITEM pKey, PHB_ITEM pValue );
-extern HB_EXPORT HB_BOOL   hb_hashAddNew( PHB_ITEM pHash, PHB_ITEM pKey, PHB_ITEM pValue );
-extern HB_EXPORT HB_BOOL   hb_hashRemove( PHB_ITEM pHash, PHB_ITEM pItem );
-extern HB_EXPORT HB_BOOL   hb_hashClear( PHB_ITEM pHash );
-extern HB_EXPORT HB_BOOL   hb_hashAllocNewPair( PHB_ITEM pHash, PHB_ITEM * pKeyPtr, PHB_ITEM * pValPtr );
-extern HB_EXPORT void      hb_hashSort( PHB_ITEM pHash );
-extern HB_EXPORT PHB_ITEM  hb_hashClone( PHB_ITEM pHash );
-extern HB_EXPORT PHB_ITEM  hb_hashCloneTo( PHB_ITEM pDest, PHB_ITEM pHash );
-extern HB_EXPORT void      hb_hashJoin( PHB_ITEM pDest, PHB_ITEM pSource, int iType );
-extern HB_EXPORT HB_BOOL   hb_hashScan( PHB_ITEM pHash, PHB_ITEM pKey, HB_SIZE * pnPos );
-extern HB_EXPORT HB_BOOL   hb_hashScanSoft( PHB_ITEM pHash, PHB_ITEM pKey, HB_SIZE * pnPos );
-extern HB_EXPORT void      hb_hashPreallocate( PHB_ITEM pHash, HB_SIZE nNewSize );
-extern HB_EXPORT PHB_ITEM  hb_hashGetKeys( PHB_ITEM pHash );
-extern HB_EXPORT PHB_ITEM  hb_hashGetValues( PHB_ITEM pHash );
-extern HB_EXPORT void      hb_hashSetDefault( PHB_ITEM pHash, PHB_ITEM pValue );
-extern HB_EXPORT PHB_ITEM  hb_hashGetDefault( PHB_ITEM pHash );
-extern HB_EXPORT void      hb_hashSetFlags( PHB_ITEM pHash, int iFlags );
-extern HB_EXPORT void      hb_hashClearFlags( PHB_ITEM pHash, int iFlags );
-extern HB_EXPORT int       hb_hashGetFlags( PHB_ITEM pHash );
-extern HB_EXPORT void *    hb_hashId( PHB_ITEM pHash ); /* retrieves the hash unique ID */
+extern HB_EXPORT PHB_ITEM     hb_hashNew( PHB_ITEM pItem );
+extern HB_EXPORT HB_SIZE      hb_hashLen( PHB_ITEM pHash );
+extern HB_EXPORT HB_BOOL      hb_hashDel( PHB_ITEM pHash, PHB_ITEM pKey );
+extern HB_EXPORT HB_BOOL      hb_hashAdd( PHB_ITEM pHash, PHB_ITEM pKey, PHB_ITEM pValue );
+extern HB_EXPORT HB_BOOL      hb_hashAddNew( PHB_ITEM pHash, PHB_ITEM pKey, PHB_ITEM pValue );
+extern HB_EXPORT HB_BOOL      hb_hashRemove( PHB_ITEM pHash, PHB_ITEM pItem );
+extern HB_EXPORT HB_BOOL      hb_hashClear( PHB_ITEM pHash );
+extern HB_EXPORT HB_BOOL      hb_hashAllocNewPair( PHB_ITEM pHash, PHB_ITEM * pKeyPtr, PHB_ITEM * pValPtr );
+extern HB_EXPORT void         hb_hashSort( PHB_ITEM pHash );
+extern HB_EXPORT PHB_ITEM     hb_hashClone( PHB_ITEM pHash );
+extern HB_EXPORT PHB_ITEM     hb_hashCloneTo( PHB_ITEM pDest, PHB_ITEM pHash );
+extern HB_EXPORT void         hb_hashJoin( PHB_ITEM pDest, PHB_ITEM pSource, int iType );
+extern HB_EXPORT HB_BOOL      hb_hashScan( PHB_ITEM pHash, PHB_ITEM pKey, HB_SIZE * pnPos );
+extern HB_EXPORT HB_BOOL      hb_hashScanSoft( PHB_ITEM pHash, PHB_ITEM pKey, HB_SIZE * pnPos );
+extern HB_EXPORT void         hb_hashPreallocate( PHB_ITEM pHash, HB_SIZE nNewSize );
+extern HB_EXPORT PHB_ITEM     hb_hashGetKeys( PHB_ITEM pHash );
+extern HB_EXPORT PHB_ITEM     hb_hashGetValues( PHB_ITEM pHash );
+extern HB_EXPORT void         hb_hashSetDefault( PHB_ITEM pHash, PHB_ITEM pValue );
+extern HB_EXPORT PHB_ITEM     hb_hashGetDefault( PHB_ITEM pHash );
+extern HB_EXPORT void         hb_hashSetFlags( PHB_ITEM pHash, int iFlags );
+extern HB_EXPORT void         hb_hashClearFlags( PHB_ITEM pHash, int iFlags );
+extern HB_EXPORT int          hb_hashGetFlags( PHB_ITEM pHash );
+extern HB_EXPORT void *       hb_hashId( PHB_ITEM pHash ); /* retrieves the hash unique ID */
+extern HB_EXPORT HB_COUNTER   hb_hashRefs( PHB_ITEM pHash ); /* retrieves numer of references to the hash */
 
 /* these hb_hashGet*() functions are dangerous, be sure that base HASH value will not be changed */
-extern HB_EXPORT PHB_ITEM  hb_hashGetItemPtr( PHB_ITEM pHash, PHB_ITEM pKey, int iFlags );
-extern HB_EXPORT PHB_ITEM  hb_hashGetItemRefPtr( PHB_ITEM pHash, PHB_ITEM pKey );
-extern HB_EXPORT PHB_ITEM  hb_hashGetCItemPtr( PHB_ITEM pHash, const char * pszKey );
-extern HB_EXPORT HB_SIZE   hb_hashGetCItemPos( PHB_ITEM pHash, const char * pszKey );
-extern HB_EXPORT PHB_ITEM  hb_hashGetKeyAt( PHB_ITEM pHash, HB_SIZE nPos );
-extern HB_EXPORT PHB_ITEM  hb_hashGetValueAt( PHB_ITEM pHash, HB_SIZE nPos );
+extern HB_EXPORT PHB_ITEM    hb_hashGetItemPtr( PHB_ITEM pHash, PHB_ITEM pKey, int iFlags );
+extern HB_EXPORT PHB_ITEM    hb_hashGetItemRefPtr( PHB_ITEM pHash, PHB_ITEM pKey );
+extern HB_EXPORT PHB_ITEM    hb_hashGetCItemPtr( PHB_ITEM pHash, const char * pszKey );
+extern HB_EXPORT HB_SIZE     hb_hashGetCItemPos( PHB_ITEM pHash, const char * pszKey );
+extern HB_EXPORT PHB_ITEM    hb_hashGetKeyAt( PHB_ITEM pHash, HB_SIZE nPos );
+extern HB_EXPORT PHB_ITEM    hb_hashGetValueAt( PHB_ITEM pHash, HB_SIZE nPos );
 
-extern HB_EXPORT HB_BOOL   hb_hashDelAt( PHB_ITEM pHash, HB_SIZE nPos );
+extern HB_EXPORT HB_BOOL     hb_hashDelAt( PHB_ITEM pHash, HB_SIZE nPos );
 
 /* hash item flags */
 #define HB_HASH_AUTOADD_NEVER       0x00
@@ -1071,7 +1073,8 @@ extern HB_EXPORT void          hb_winmainArgVFree( void );
 #endif
 
 /* Codeblock management */
-extern HB_EXPORT void * hb_codeblockId( PHB_ITEM pItem ); /* retrieves the codeblock unique ID */
+extern HB_EXPORT void *       hb_codeblockId( PHB_ITEM pItem ); /* retrieves the codeblock unique ID */
+extern HB_EXPORT HB_COUNTER   hb_codeblockRefs( PHB_ITEM pItem ); /* retrieves numer of references to the codeblock */
 extern PHB_CODEBLOCK    hb_codeblockNew( const HB_BYTE * pBuffer, HB_USHORT uiLocals, const HB_BYTE * pLocalPosTable, PHB_SYMB pSymbols, HB_SIZE nLen ); /* create a code-block */
 extern PHB_CODEBLOCK    hb_codeblockMacroNew( const HB_BYTE * pBuffer, HB_SIZE nLen );
 extern PHB_ITEM         hb_codeblockGetVar( PHB_ITEM pItem, int iItemPos ); /* get local variable referenced in a codeblock */
@@ -1200,16 +1203,19 @@ extern HB_EXPORT const char * hb_verFlagsPRG( void );        /* retrieves a stat
 extern HB_EXPORT const char * hb_verHB_PLAT( void );         /* retrieves a static buffer containing build time HB_PLATFORM setting */
 extern HB_EXPORT const char * hb_verHB_COMP( void );         /* retrieves a static buffer containing build time HB_COMPILER setting */
 
-extern HB_EXPORT HB_BOOL hb_iswin9x( void );    /* return HB_TRUE if OS == Windows 9x, ME */
-extern HB_EXPORT HB_BOOL hb_iswinnt( void );    /* return HB_TRUE if OS == Windows NT or newer */
+extern HB_EXPORT int     hb_iswine( void );     /* return non-zero if OS == Wine */
+extern HB_EXPORT int     hb_iswin9x( void );    /* return non-zero if OS == Windows 9x, ME */
+extern HB_EXPORT int     hb_iswinnt( void );    /* return non-zero if OS == Windows NT or newer */
 extern HB_EXPORT HB_BOOL hb_iswin2k( void );    /* return HB_TRUE if OS == Windows 2000 or newer */
 extern HB_EXPORT HB_BOOL hb_iswin2k3( void );   /* return HB_TRUE if OS == Windows 2003 Server or newer */
 extern HB_EXPORT HB_BOOL hb_iswinvista( void ); /* return HB_TRUE if OS == Windows Vista or newer */
+extern HB_EXPORT HB_BOOL hb_iswin7( void );     /* return HB_TRUE if OS == Windows 7 or newer */
 extern HB_EXPORT HB_BOOL hb_iswin8( void );     /* return HB_TRUE if OS == Windows 8 or newer */
 extern HB_EXPORT HB_BOOL hb_iswin81( void );    /* return HB_TRUE if OS == Windows 8.1 or newer */
 extern HB_EXPORT HB_BOOL hb_iswin10( void );    /* return HB_TRUE if OS == Windows 10 or newer */
 extern HB_EXPORT HB_BOOL hb_iswince( void );    /* return HB_TRUE if OS is Windows CE or Windows Mobile */
-extern HB_EXPORT HB_BOOL hb_iswinver( int iMajorVersion, int iMinorVersion, int iType, HB_BOOL fOrUpper );
+extern HB_EXPORT HB_BOOL hb_iswinver( int iMajor, int iMinor, int iType, HB_BOOL fOrUpper );
+extern HB_EXPORT HB_BOOL hb_iswinsp( int iServicePackMajor, HB_BOOL fOrUpper );
 
 extern HB_EXPORT HB_BOOL hb_printerIsReady( const char * pszPrinterName );
 
