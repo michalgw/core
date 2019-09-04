@@ -128,6 +128,7 @@ static HB_GT_FUNCS SuperTable;
 #define TERM_CYGWIN        5
 #define TERM_PUTTY         16
 
+#define HB_GTTRM_CLRNDF   -1
 #define HB_GTTRM_CLRSTD    0
 #define HB_GTTRM_CLRX16    1
 #define HB_GTTRM_CLR256    2
@@ -3165,7 +3166,7 @@ static void hb_gt_trm_SetTerm( PHB_GTTRM pTerm )
    pTerm->mouse_type    = MOUSE_NONE;
    pTerm->esc_delay     = ESC_DELAY;
    pTerm->iAttrMask     = ~HB_GTTRM_ATTR_BOX;
-   pTerm->iExtColor     = HB_GTTRM_CLRSTD;
+   pTerm->iExtColor     = HB_GTTRM_CLRNDF;
    pTerm->terminal_ext  = 0;
    pTerm->fAM           = HB_FALSE;
 
@@ -3220,13 +3221,21 @@ static void hb_gt_trm_SetTerm( PHB_GTTRM pTerm )
          if( szTerm == NULL || *szTerm == '\0' )
             szTerm = "ansi";
       }
+      if( strncmp( szTerm, "putty", 5 ) == 0 )
+         pTerm->terminal_ext |= TERM_PUTTY;
    }
 
-   if( ( pTerm->terminal_ext & TERM_PUTTY ) ||
-       strstr( szTerm, "xterm" ) != NULL ||
-       strncmp( szTerm, "rxvt", 4 ) == 0 ||
-       strcmp( szTerm, "putty" ) == 0 ||
-       strncmp( szTerm, "screen", 6 ) == 0 )
+   if( ( pTerm->terminal_ext & TERM_PUTTY ) ||  /* PuTTY terminal emulator */
+       strncmp( szTerm, "xterm", 5 ) == 0 ||    /* X11 terminal emulator */
+       strncmp( szTerm, "rxvt", 4 ) == 0 ||     /* rxvt terminal emulator */
+       strncmp( szTerm, "gnome", 5 ) == 0 ||    /* GNOME Terminal */
+       strncmp( szTerm, "vte", 3 ) == 0 ||      /* VTE aka GNOME Terminal */
+       strncmp( szTerm, "konsole", 7 ) == 0 ||  /* KDE console window */
+       strncmp( szTerm, "nsterm", 6 ) == 0 ||   /* Apple Terminal */
+       strncmp( szTerm, "Apple_Terminal", 14 ) == 0 || /* Apple Terminal */
+       strncmp( szTerm, "aixterm", 7 ) == 0 ||  /* IBM Aixterm Terminal Emulator */
+       strncmp( szTerm, "tmux", 4 ) == 0 ||     /* tmux terminal multiplexer */
+       strncmp( szTerm, "screen", 6 ) == 0 )    /* VT 100/ANSI X3.64 virtual terminal */
    {
       pTerm->Init           = hb_gt_trm_AnsiInit;
       pTerm->Exit           = hb_gt_trm_AnsiExit;
@@ -3241,6 +3250,17 @@ static void hb_gt_trm_SetTerm( PHB_GTTRM pTerm )
       pTerm->Bell           = hb_gt_trm_AnsiBell;
       pTerm->szAcsc         = szAcsc;
       pTerm->terminal_type  = TERM_XTERM;
+      if( pTerm->iExtColor == HB_GTTRM_CLRNDF )
+      {
+         if( pTerm->terminal_ext & TERM_PUTTY ||
+             strstr( szTerm, "+256color" ) != NULL ||
+             strstr( szTerm, "-256color" ) != NULL )
+            pTerm->iExtColor = HB_GTTRM_CLR256;
+         else if( strstr( szTerm, "-88color" ) != NULL )
+            pTerm->iExtColor = HB_GTTRM_CLRRGB;
+         else if( strstr( szTerm, "-16color" ) != NULL )
+            pTerm->iExtColor = HB_GTTRM_CLRAIX;
+      }
    }
    else if( strncmp( szTerm, "linux", 5 ) == 0 ||
             strcmp( szTerm, "cygwin" ) == 0 ||
@@ -3300,7 +3320,8 @@ static void hb_gt_trm_SetTerm( PHB_GTTRM pTerm )
       pTerm->szAcsc         = szExtAcsc;
       pTerm->terminal_type  = TERM_ANSI;
    }
-
+   if( pTerm->iExtColor == HB_GTTRM_CLRNDF )
+      pTerm->iExtColor = HB_GTTRM_CLRSTD;
    pTerm->fStdinTTY      = hb_fsIsDevice( pTerm->hFilenoStdin );
    pTerm->fStdoutTTY     = hb_fsIsDevice( pTerm->hFilenoStdout );
    pTerm->fStderrTTY     = hb_fsIsDevice( pTerm->hFilenoStderr );
@@ -4002,6 +4023,29 @@ static HB_BOOL hb_gt_trm_Info( PHB_GT pGT, int iType, PHB_GT_INFO pInfo )
          }
          break;
 
+      case HB_GTI_SCREENDEPTH:
+         switch( pTerm->iExtColor )
+         {
+            case HB_GTTRM_CLRRGB:
+               iVal = 8;
+               break;
+            case HB_GTTRM_CLR256:
+               iVal = 6;
+               break;
+            case HB_GTTRM_CLRX16:
+            case HB_GTTRM_CLRAIX:
+               iVal = 4;
+               break;
+            case HB_GTTRM_CLRSTD:
+               iVal = ( pTerm->terminal_type == TERM_LINUX ||
+                        ( pTerm->terminal_ext & TERM_PUTTY ) ) ? 8 : 3;
+               break;
+            default:
+               iVal = 3;
+               break;
+         }
+         pInfo->pResult = hb_itemPutNI( pInfo->pResult, iVal );
+         break;
 
       case HB_GTI_PALETTE:
          if( hb_itemType( pInfo->pNewVal ) & HB_IT_NUMERIC )
